@@ -15,10 +15,7 @@ compatibility is not claimed. Semantic search indexes exported Markdown, not att
 
 Requires Node.js 24 or newer.
 
-> **npm installation is forthcoming.** The first public alpha has not been published yet.
-> Until it is available, follow the [source installation instructions](#development).
-
-Once the first alpha is published, install it with:
+Install the latest alpha:
 
 ```sh
 npm install -g @wonna/lassi@alpha
