@@ -87,7 +87,17 @@ private repository, or mismatched tag fails the job before `npm publish`.
 The workflow publishes the already tested tarball with `--access public --tag alpha` and
 provenance. Verify the registry version, the `alpha` tag, and an installation from npm after
 publication. Mark the corresponding GitHub release as a prerelease and keep its release notes
-current. Reserve `latest` for a future release intended for ordinary installs.
+current. Continue publishing alpha versions with `--tag alpha`.
+
+The npm registry requires every package to have a `latest` tag. On the first publication,
+`latest` can also point to the alpha even when `--tag alpha` is explicit. Do not try to remove
+`latest` or publish a placeholder stable version to change it. Until a stable release exists,
+a plain `npm install @wonna/lassi` can therefore install an alpha. Keep the README's alpha
+warning and document `npm install -g @wonna/lassi@alpha` for following alpha releases.
+After a stable release exists, verify that later alpha publications leave `latest` pointing
+to that stable release.
+
+Reference: [npm registry package metadata](https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md).
 
 If authorization fails, fix the setup and rerun against the same unchanged tag. If a version
 has already been published, inspect the registry before retrying; never replace its source
