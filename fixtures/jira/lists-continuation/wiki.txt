@@ -1,0 +1,3 @@
+* item with
+continuation line
+* second item

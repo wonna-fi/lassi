@@ -1,0 +1,25 @@
+{
+  "name": "@wonna/lassi",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "lassi \u2014 Jira & Confluence Data Center CLI for coding agents",
+  "type": "module",
+  "bin": {
+    "lassi": "./bin/lassi.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@wonna/lassi-confluence": "*",
+    "@wonna/lassi-core": "*",
+    "@wonna/lassi-jira": "*",
+    "@wonna/lassi-search": "*",
+    "@toon-format/toon": "^4.1.1",
+    "commander": "^15.0.0"
+  },
+  "license": "MIT"
+}

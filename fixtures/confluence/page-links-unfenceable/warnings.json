@@ -1,0 +1,9 @@
+{
+  "read": [
+    {
+      "code": "inline-unknown",
+      "name": "ri:page",
+      "path": "/p[1]"
+    }
+  ]
+}

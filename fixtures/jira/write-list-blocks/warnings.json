@@ -1,0 +1,18 @@
+[
+  {
+    "code": "list-split",
+    "line": 3
+  },
+  {
+    "code": "list-split",
+    "line": 10
+  },
+  {
+    "code": "task-marker-ambiguity",
+    "line": 11
+  },
+  {
+    "code": "list-start-dropped",
+    "line": 15
+  }
+]

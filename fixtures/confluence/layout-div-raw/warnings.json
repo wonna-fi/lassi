@@ -1,0 +1,9 @@
+{
+  "read": [
+    {
+      "code": "block-unknown",
+      "name": "div[class]",
+      "path": "/div[1]"
+    }
+  ]
+}

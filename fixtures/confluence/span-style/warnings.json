@@ -1,0 +1,9 @@
+{
+  "read": [
+    {
+      "code": "inline-unknown",
+      "name": "span[style]",
+      "path": "/p[1]"
+    }
+  ]
+}

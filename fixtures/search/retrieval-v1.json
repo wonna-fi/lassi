@@ -1,0 +1,529 @@
+{
+  "version": "jira-retrieval-v1",
+  "description": "Fabricated software-development issues. Relevance labels apply to exported Markdown, excluding binary attachment contents.",
+  "issues": [
+    {
+      "id": "101",
+      "key": "PROJ-101",
+      "fields": {
+        "summary": "Session refresh fails during parallel requests",
+        "description": "Two API calls renew an expired session at the same time. A race invalidates the new session.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [
+            {
+              "id": "1",
+              "body": "Investigating timing.",
+              "created": "2026-09-01T10:00:00Z"
+            },
+            {
+              "id": "2",
+              "body": "The first request succeeds.",
+              "created": "2026-09-02T10:00:00Z"
+            },
+            {
+              "id": "3",
+              "body": "Reproduced with two clients.",
+              "created": "2026-09-03T10:00:00Z"
+            },
+            {
+              "id": "4",
+              "body": "A lock reduced failures.",
+              "created": "2026-09-04T10:00:00Z"
+            },
+            {
+              "id": "5",
+              "body": "The lock expires too early.",
+              "created": "2026-09-05T10:00:00Z"
+            },
+            {
+              "id": "6",
+              "body": "The fix is under test.",
+              "created": "2026-09-06T10:00:00Z"
+            },
+            {
+              "id": "7",
+              "body": "Use singleFlightRefresh to share one token renewal promise across concurrent requests.",
+              "created": "2026-09-07T10:00:00Z"
+            }
+          ],
+          "total": 7,
+          "startAt": 0,
+          "maxResults": 7
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "102",
+      "key": "PROJ-102",
+      "fields": {
+        "summary": "Empty password crashes validation",
+        "description": "PasswordValidator.validate throws NullPointerException when the submitted password is empty.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "103",
+      "key": "PROJ-103",
+      "fields": {
+        "summary": "Payment service exceeds rate limit",
+        "description": "HTTP 429 during payment retries. Honor Retry-After and use bounded exponential backoff.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "104",
+      "key": "PROJ-104",
+      "fields": {
+        "summary": "Card charged twice after timeout",
+        "description": "A timeout occurs after capture. Retrying without an idempotency key duplicates the card charge.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "105",
+      "key": "PROJ-105",
+      "fields": {
+        "summary": "OAuth login rejects valid code",
+        "description": "invalid_grant occurs because the workstation clock is five minutes ahead. Synchronize the clock.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "106",
+      "key": "PROJ-106",
+      "fields": {
+        "summary": "Uploads fail on removable disks",
+        "description": "The destination filesystem does not support hard links. An exclusive copy can publish the upload.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "107",
+      "key": "PROJ-107",
+      "fields": {
+        "summary": "Proxy certificate rejected",
+        "description": "UNABLE_TO_VERIFY_LEAF_SIGNATURE behind a TLS proxy. Add the trusted root CA to Node certificate configuration.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "108",
+      "key": "PROJ-108",
+      "fields": {
+        "summary": "Cached issue description stays old",
+        "description": "The cache key omits the issue revision. Invalidate cached data after an update.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "109",
+      "key": "PROJ-109",
+      "fields": {
+        "summary": "Database connection pool exhausted",
+        "description": "Workers retain database connections after cancelled requests. Release connections in finally.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "110",
+      "key": "PROJ-110",
+      "fields": {
+        "summary": "Background jobs run twice",
+        "description": "A worker lease expires before processing ends. Another worker starts the same job. Renew the lease.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "111",
+      "key": "PROJ-111",
+      "fields": {
+        "summary": "Käyttöoikeus puuttuu projektin vaihdon jälkeen",
+        "description": "Käyttäjä ei näe uuden projektin tehtäviä. Oikeusryhmän jäsenyys päivittyy vasta seuraavalla kirjautumisella.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "112",
+      "key": "PROJ-112",
+      "fields": {
+        "summary": "Release diagnostics require investigation",
+        "description": "The reproduction and diagnostic output are attached. Read the file to identify the failure.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [
+          {
+            "id": "9001",
+            "filename": "trace.log",
+            "mimeType": "text/plain",
+            "size": 73,
+            "content": "https://jira.example.internal/download/9001"
+          }
+        ],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "113",
+      "key": "PROJ-113",
+      "fields": {
+        "summary": "Mobile login shows a blank screen",
+        "description": "The mobile browser caches an old JavaScript bundle. Clear the service worker cache.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "114",
+      "key": "PROJ-114",
+      "fields": {
+        "summary": "Browser blocks API request after sign-in",
+        "description": "CORS preflight lacks the Authorization header in Access-Control-Allow-Headers.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "115",
+      "key": "PROJ-115",
+      "fields": {
+        "summary": "Dependency injection fails at startup",
+        "description": "CircularDependencyException between SessionService and AuditWriter. Move event emission behind a queue.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    },
+    {
+      "id": "116",
+      "key": "PROJ-116",
+      "fields": {
+        "summary": "List endpoint stops after the first page",
+        "description": "The server caps page size below maxResults. Advance startAt by the actual returned count.",
+        "updated": "2026-09-01T12:00:00Z",
+        "comment": {
+          "comments": [],
+          "total": 0,
+          "startAt": 0,
+          "maxResults": 0
+        },
+        "attachment": [],
+        "issuelinks": []
+      }
+    }
+  ],
+  "attachments": {
+    "9001": "E_STREAM_742 decoder buffer overrun in parseFrame after truncated input.\n"
+  },
+  "queries": [
+    {
+      "id": "key",
+      "query": "PROJ-102",
+      "relevant": [
+        "PROJ-102"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "error",
+      "query": "NullPointerException PasswordValidator",
+      "relevant": [
+        "PROJ-102"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "symbol",
+      "query": "singleFlightRefresh",
+      "relevant": [
+        "PROJ-101"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "grant",
+      "query": "invalid_grant",
+      "relevant": [
+        "PROJ-105"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "certificate",
+      "query": "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+      "relevant": [
+        "PROJ-107"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "dependency",
+      "query": "CircularDependencyException",
+      "relevant": [
+        "PROJ-115"
+      ],
+      "kind": "exact",
+      "language": "en"
+    },
+    {
+      "id": "parallel",
+      "query": "Why does renewing a session break when several requests arrive together?",
+      "relevant": [
+        "PROJ-101"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "parallel-fi",
+      "query": "Miksi istunnon uusiminen epäonnistuu rinnakkaisilla pyynnöillä?",
+      "relevant": [
+        "PROJ-101"
+      ],
+      "kind": "semantic",
+      "language": "fi"
+    },
+    {
+      "id": "empty",
+      "query": "Submitting no password makes the backend crash",
+      "relevant": [
+        "PROJ-102"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "rate",
+      "query": "How should payment retries respond when the server asks us to slow down?",
+      "relevant": [
+        "PROJ-103"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "double",
+      "query": "Customer paid twice when the first payment seemed to time out",
+      "relevant": [
+        "PROJ-104"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "payments",
+      "query": "Problems caused by retrying payments",
+      "relevant": [
+        "PROJ-103",
+        "PROJ-104"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "clock",
+      "query": "Signing in fails when the computer time is incorrect",
+      "relevant": [
+        "PROJ-105"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "permission-en",
+      "query": "Cannot see tickets after moving to another project until signing in again",
+      "relevant": [
+        "PROJ-111"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "permission-fi",
+      "query": "Projektin vaihdon jälkeen tehtävät eivät näy käyttäjälle",
+      "relevant": [
+        "PROJ-111"
+      ],
+      "kind": "semantic",
+      "language": "fi"
+    },
+    {
+      "id": "disk",
+      "query": "Publishing a file on a disk without hard link support fails",
+      "relevant": [
+        "PROJ-106"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "pool",
+      "query": "Cancelled requests eventually use up every database connection",
+      "relevant": [
+        "PROJ-109"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "jobs",
+      "query": "Two workers process the same job after its lease expires",
+      "relevant": [
+        "PROJ-110"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "pages",
+      "query": "Why does listing stop early when the server returns fewer records than requested?",
+      "relevant": [
+        "PROJ-116"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "startup",
+      "query": "Services cannot start because their constructors depend on each other",
+      "relevant": [
+        "PROJ-115"
+      ],
+      "kind": "semantic",
+      "language": "en"
+    },
+    {
+      "id": "no-answer",
+      "query": "A guide to configuring satellite orbit telemetry",
+      "relevant": [],
+      "kind": "no-answer",
+      "language": "en"
+    },
+    {
+      "id": "no-answer-fi",
+      "query": "Miten kasvatetaan tomaatteja kasvihuoneessa?",
+      "relevant": [],
+      "kind": "no-answer",
+      "language": "fi"
+    },
+    {
+      "id": "attachment-only",
+      "query": "E_STREAM_742 decoder buffer overrun",
+      "relevant": [],
+      "kind": "attachment-only",
+      "language": "en"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# The bin shebang and every script must stay LF on Windows checkouts.
+* text=auto eol=lf
+# Converter fixtures are byte-level specs; never normalise them.
+fixtures/** -text

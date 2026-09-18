@@ -1,0 +1,19 @@
+{code:java}
+class A {
+  int x = 1 * 2;
+}
+{code}
+
+{code}
+no language
+{code}
+
+{code:lang=ts}const x: number = 1;{code}
+
+{noformat}
+  *not bold*  {{not mono}}
+{noformat}
+
+{code:title=Foo.java|borderStyle=solid}
+kept verbatim
+{code}

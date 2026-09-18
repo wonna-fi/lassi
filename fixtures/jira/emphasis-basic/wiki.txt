@@ -1,0 +1,5 @@
+Some *bold*, _italic_ and -struck- words.
+
+Nested: *bold with _italic_ inside* and _italic with *bold* inside_.
+
+Whole line *bold*

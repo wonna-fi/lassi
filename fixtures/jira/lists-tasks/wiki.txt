@@ -1,0 +1,3 @@
+* (x) todo item
+* (/) done item
+* plain item with (x) mid-text

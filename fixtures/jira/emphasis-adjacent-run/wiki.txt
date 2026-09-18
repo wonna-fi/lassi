@@ -1,0 +1,1 @@
+Three touching *a*{*}b{*}{*}c{*} spans, and intra-word x{*}d{*}{*}e{*}f too.

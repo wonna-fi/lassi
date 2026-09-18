@@ -1,0 +1,3 @@
+Use `git status` and `*not bold*` and `a`b joined.
+
+Monospace with braces `obj.get("k")` and pipes `a|b` in prose.

@@ -1,0 +1,7 @@
+Inline !screen.png! and thumbnail !screen.png|thumbnail! and remote !https://x.example.com/i.png!.
+
+Pasted !image-2026-09-05-10-00-00-123.png|width=1136,height=560! and aligned !pic.png|align=right,vspace=4! keep their parameters.
+
+Free text !x.png|alt=two words! is not representable.
+
+Wow\!Nice! and Hello!world are prose.

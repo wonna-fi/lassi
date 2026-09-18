@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "useTabs": false,
+  "trailingComma": "es5",
+  "printWidth": 100,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "**/*.md",
+    "node_modules/",
+    "dist/",
+    "coverage/",
+    "package-lock.json",
+    "fixtures/",
+    "skills/",
+    ".idea/",
+    ".vscode/",
+    "release/",
+    "artifacts/"
+  ]
+}

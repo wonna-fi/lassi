@@ -1,0 +1,11 @@
+bq. A single line quote with *bold*
+
+{quote}
+First paragraph.
+
+Second paragraph with _emphasis_.
+
+* and a list
+{quote}
+
+bq. inline quote

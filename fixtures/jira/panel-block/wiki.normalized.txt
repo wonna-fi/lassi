@@ -1,0 +1,14 @@
+{panel:title=My Title|borderStyle=dashed}
+Panel body with *bold*
+* list inside
+{panel}
+
+{expand:Click me}
+hidden
+{expand}
+
+{anchor:top}
+
+{toc}
+
+Text after {unterminated macro

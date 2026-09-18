@@ -1,0 +1,3 @@
+```confluence
+<div class="contentLayout2"><div class="columnLayout single" data-layout="single"><div class="cell normal" data-type="normal"><div class="innerCell"><p>inside</p></div></div></div></div>
+```

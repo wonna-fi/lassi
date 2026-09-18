@@ -1,0 +1,19 @@
+{
+  "read": [
+    {
+      "code": "block-unknown",
+      "name": "macro:details",
+      "path": "/ac:structured-macro[1]"
+    },
+    {
+      "code": "block-unknown",
+      "name": "macro:expand",
+      "path": "/ac:structured-macro[2]"
+    },
+    {
+      "code": "block-unknown",
+      "name": "macro:drawio",
+      "path": "/ac:structured-macro[3]"
+    }
+  ]
+}

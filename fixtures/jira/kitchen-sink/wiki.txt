@@ -1,0 +1,23 @@
+h2. Login page throws 500 on empty password
+
+*Steps to reproduce*
+# Open [the login page|https://app.example.internal/login]
+# Leave the password empty
+# Click *Sign in*
+
+*Actual*: HTTP 500, see !stack.png|thumbnail! and the log:
+{code:text}
+NullPointerException at Login.validate(Login.java:42)
+{code}
+
+*Expected*: a validation message. Related: [~jsmith] said in PROJ-12 that {{dto.password}} is optional.
+
+||Env||Result||
+|prod|500|
+|staging|works|
+
+{quote}
+Regression from the 2.3.0 release.
+{quote}
+----
+(x) not fixed yet

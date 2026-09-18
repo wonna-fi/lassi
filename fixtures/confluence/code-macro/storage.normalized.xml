@@ -1,0 +1,3 @@
+<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">java</ac:parameter><ac:parameter ac:name="title">Foo.java</ac:parameter><ac:plain-text-body><![CDATA[class Foo {
+  String s = "a]]]]><![CDATA[>b";
+}]]></ac:plain-text-body></ac:structured-macro>

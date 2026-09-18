@@ -1,0 +1,5 @@
+```confluence
+<p>Done <ac:emoticon ac:name="tick" /> and <ac:structured-macro ac:name="status"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">OK</ac:parameter></ac:structured-macro>.</p>
+```
+
+Plain follows.

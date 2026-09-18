@@ -1,0 +1,42 @@
+{
+  "name": "lassi-workspace",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "lassi: Jira & Confluence Data Center CLI for coding agents (workspace root)",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -b && node scripts/write-build-info.mjs && node scripts/build-package.mjs",
+    "typecheck": "tsc -b",
+    "lint": "oxlint --deny-warnings && node scripts/check-boundaries.mjs",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "eval:retrieval": "node scripts/eval-retrieval.ts",
+    "smoke:readonly": "node scripts/smoke-readonly.ts",
+    "pack": "node scripts/pack.mjs",
+    "test:package": "node scripts/test-package.mjs",
+    "release:version": "node scripts/release-version.mjs",
+    "release:check": "node scripts/check-release.mjs",
+    "release:rehearse": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run pack && node scripts/rehearse-release.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^5.0.0",
+    "esbuild": "0.28.2",
+    "fast-check": "^4.9.0",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.0"
+  },
+  "license": "MIT"
+}

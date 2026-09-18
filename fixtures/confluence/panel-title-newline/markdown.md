@@ -1,0 +1,3 @@
+```confluence
+<ac:structured-macro ac:name="info"><ac:parameter ac:name="title">Two&#10;lines</ac:parameter><ac:rich-text-body><p>Body.</p></ac:rich-text-body></ac:structured-macro>
+```

@@ -1,0 +1,7 @@
+Before.
+
+```confluence
+<ac:structured-macro ac:name="excerpt" ac:schema-version="1" ac:macro-id="f00d"><ac:rich-text-body><p>Kept <b>verbatim</b>, <span style="color: red;">colour</span> and all.</p></ac:rich-text-body></ac:structured-macro>
+```
+
+After.

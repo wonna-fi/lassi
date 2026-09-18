@@ -1,0 +1,24 @@
+{
+  "name": "@wonna/lassi-jira",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "lassi Jira Data Center client and wiki-markup <-> markdown converters",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "dependencies": {
+    "@wonna/lassi-core": "*",
+    "@types/mdast": "^4.0.4",
+    "mdast-util-to-string": "^4.0.0",
+    "unist-util-visit": "^5.1.0"
+  },
+  "license": "MIT"
+}

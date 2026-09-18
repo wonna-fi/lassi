@@ -1,0 +1,11 @@
+```confluence
+<ac:structured-macro ac:name="details" ac:schema-version="1"><ac:parameter ac:name="id">props</ac:parameter><ac:rich-text-body><table><tbody><tr><th>Owner</th><td>jsmith</td></tr></tbody></table></ac:rich-text-body></ac:structured-macro>
+```
+
+```confluence
+<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">More</ac:parameter><ac:rich-text-body><p>hidden</p></ac:rich-text-body></ac:structured-macro>
+```
+
+```confluence
+<ac:structured-macro ac:name="drawio"><ac:parameter ac:name="diagramName">arch</ac:parameter><ac:parameter ac:name="baseUrl">https://x.example.internal</ac:parameter></ac:structured-macro>
+```

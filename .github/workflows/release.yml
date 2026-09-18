@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/**'
+      - 'packages/**'
+      - 'skills/**'
+      - 'package*.json'
+      - 'vitest.config.ts'
+      - 'README.md'
+      - 'LICENSE'
+  workflow_dispatch:
+  push:
+    tags: ['v*-alpha.*']
+
+permissions:
+  contents: read
+
+env:
+  NPM_VERSION: '11.19.0'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      tarball: ${{ steps.candidate.outputs.tarball }}
+      sha512: ${{ steps.candidate.outputs.sha512 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the release npm version
+        run: npm install --global npm@${{ env.NPM_VERSION }} --ignore-scripts --no-audit --no-fund
+      - run: npm ci
+      - name: Build, verify and rehearse publication
+        id: candidate
+        run: npm run release:rehearse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: artifacts/${{ steps.candidate.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TARBALL: ${{ needs.build.outputs.tarball }}
+      RELEASE_SHA512: ${{ needs.build.outputs.sha512 }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the release npm version
+        run: npm install --global npm@${{ env.NPM_VERSION }} --ignore-scripts --no-audit --no-fund
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-candidate
+          path: artifacts
+      - name: Check the original package and source commit
+        run: npm run release:check -- "./artifacts/$RELEASE_TARBALL" "$RELEASE_SHA512"
+      - name: Test the exact package built on Linux
+        run: npm run test:package -- "./artifacts/$RELEASE_TARBALL"
+      - name: Check that verification preserved the package
+        run: npm run release:check -- "./artifacts/$RELEASE_TARBALL" "$RELEASE_SHA512"
+
+  publish:
+    needs: [build, verify]
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.repository == 'wonna-fi/lassi' &&
+      github.event.repository.private == false &&
+      vars.NPM_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TARBALL: ${{ needs.build.outputs.tarball }}
+      RELEASE_SHA512: ${{ needs.build.outputs.sha512 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org/'
+      - name: Install the release npm version
+        run: npm install --global npm@${{ env.NPM_VERSION }} --ignore-scripts --no-audit --no-fund
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-candidate
+          path: artifacts
+      - name: Verify the artifact and anonymously accessible release tag
+        run: npm run release:check -- "./artifacts/$RELEASE_TARBALL" "$RELEASE_SHA512" --publish
+      - name: Publish the tested package with provenance
+        run: npm publish "./artifacts/$RELEASE_TARBALL" --access public --tag alpha --provenance --ignore-scripts --registry https://registry.npmjs.org/

@@ -1,0 +1,6 @@
+* one
+** two
+*** three
+** two again
+* four
+- dash bullet

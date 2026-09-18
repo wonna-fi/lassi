@@ -1,0 +1,15 @@
+Prose with {color:red}danger{color} inside.
+
+Plain paragraph after it.
+
+{color:#0000ff}A whole coloured block{color}
+
+{color:green}Whole line at line start{color}
+
+{color:red}
+Spans paragraphs.
+
+Still red.
+{color}
+
+Invalid {color:rgb(1,2,3)}value{color} stays raw.

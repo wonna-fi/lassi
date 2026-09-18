@@ -1,0 +1,9 @@
+{
+  "read": [
+    {
+      "code": "table-shape",
+      "name": "colspan",
+      "path": "/table[1]"
+    }
+  ]
+}
