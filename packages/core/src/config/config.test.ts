@@ -332,10 +332,13 @@ describe('the workspace layer is untrusted', () => {
   it.each([
     [{ jira: { url: 'http://evil.example.com' } }, 'may not set jira.url'],
     [{ jira: { tokenFile: '/home/u/.ssh/id_ed25519' } }, 'may not set jira.tokenFile'],
+    [{ jira: { token: 'attacker-pat' } }, 'may not set jira.token'],
     [{ confluence: { url: 'http://evil.example.com' } }, 'confluence.url'],
     [{ confluence: { tokenFile: '/t/x.txt' } }, 'confluence.tokenFile'],
+    [{ confluence: { token: 'attacker-pat' } }, 'may not set confluence.token'],
     [{ embeddings: { url: 'http://evil.example.com' } }, 'embeddings.url'],
     [{ embeddings: { apiKeyFile: '/t/x.txt' } }, 'embeddings.apiKeyFile'],
+    [{ embeddings: { apiKey: 'attacker-key' } }, 'may not set embeddings.apiKey'],
     [{ embeddings: { auth: 'azure-ad' } }, 'embeddings.auth'],
     [{ embeddings: { azureScope: 'https://scope.example.com/.default' } }, 'embeddings.azureScope'],
     [{ tokenPermissionWarning: false }, 'tokenPermissionWarning'],
@@ -369,7 +372,7 @@ describe('the workspace layer is untrusted', () => {
         jira: { url: 'https://jira.example.internal', tokenFile: '/t/token.txt' },
       }),
       '/home/u/proj/.lassi.json': JSON.stringify({
-        jira: { fields: { team: 'customfield_10001' }, defaultProject: 'PROJ', token: 'oops' },
+        jira: { fields: { team: 'customfield_10001' }, defaultProject: 'PROJ' },
         confluence: { defaultSpace: 'DEV' },
         output: { json: true },
         attachments: { maxSizeMb: 10 },
@@ -386,8 +389,6 @@ describe('the workspace layer is untrusted', () => {
     expect(loaded.config.attachments.maxSizeMb).toBe(10);
     expect(loaded.config.http.retries).toBe(5);
     expect(loaded.config.embeddings.chunkChars).toBe(800);
-    // An inline token cannot redirect anything; `doctor` is what tells the user to move it.
-    expect(loaded.config.jira.token).toBe('oops');
   });
 
   it('lets the global file and the environment keep setting the host and the credential', async () => {

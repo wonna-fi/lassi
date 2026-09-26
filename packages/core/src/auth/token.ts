@@ -33,6 +33,10 @@ export async function resolveToken(input: {
       missing: `no token configured for ${input.product}: set ${input.product}.tokenFile in ~/.lassi.json or ${ENV_NAME[input.product]}`,
       unreadable: (path) => `token file not readable: ${path}`,
       empty: (path) => `token file is empty: ${path}`,
+      malformed: (path) =>
+        path === undefined
+          ? `the ${input.product} token (${ENV_NAME[input.product]} or ${input.product}.token) contains a line break or another control character`
+          : `token file has a line break or another control character inside the token: ${path}`,
     },
   });
   return {

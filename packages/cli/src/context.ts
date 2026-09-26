@@ -191,6 +191,10 @@ export async function buildContext(deps: CliDeps, flags: GlobalFlags): Promise<C
             'no embeddings API key configured: set embeddings.apiKeyFile in ~/.lassi.json or LASSI_EMBEDDINGS_API_KEY (or embeddings.auth: "azure-ad" for az login)',
           unreadable: (path) => `embeddings API key file not readable: ${path}`,
           empty: (path) => `embeddings API key file is empty: ${path}`,
+          malformed: (path) =>
+            path === undefined
+              ? 'the embeddings API key (LASSI_EMBEDDINGS_API_KEY or embeddings.apiKey) contains a line break or another control character'
+              : `embeddings API key file has a line break or another control character inside the key: ${path}`,
         },
       });
       secrets.add(key.value);

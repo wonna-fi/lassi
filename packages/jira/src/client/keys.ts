@@ -17,6 +17,17 @@ export function assertIssueKey(value: string): string {
   return value;
 }
 
+/** Comment ids are decimal; `..` would otherwise resolve `…/comment/..` to the issue itself. */
+export function assertCommentId(value: string): string {
+  if (!/^\d+$/.test(value)) {
+    throw new LassiError(
+      'usage',
+      `not a Jira comment id: ${value} (expected a number, e.g. 10001)`
+    );
+  }
+  return value;
+}
+
 export interface BranchKeyOptions {
   /** `jira.branchPattern`: a regular expression whose first capture group is the key. */
   pattern?: string;

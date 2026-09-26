@@ -73,14 +73,59 @@ describe('createHttpClient', () => {
     expect(fetch.calls[0]?.url.search).toBe('?jql=a+%3D+%22b%22&maxResults=5&expand=x&expand=y');
   });
 
-  it('returns undefined for 204 and non-JSON bodies', async () => {
+  it('returns undefined for 204 and empty bodies', async () => {
     const fetch = fakeFetch([
       { method: 'PUT', path: '/jira/rest/api/2/issue/PROJ-1', status: 204 },
-      { method: 'GET', path: '/jira/status', text: 'RUNNING' },
+      { method: 'POST', path: '/jira/rest/api/2/issueLink', status: 201, text: '' },
     ]);
     const { c } = client(fetch);
     expect(await c.put('/rest/api/2/issue/PROJ-1', { fields: {} })).toBeUndefined();
-    expect(await c.get('/status')).toBeUndefined();
+    expect(await c.post('/rest/api/2/issueLink', {})).toBeUndefined();
+  });
+
+  it('refuses a 2xx body that is not JSON, so a proxy page cannot pass for a write', async () => {
+    const fetch = fakeFetch([
+      {
+        method: 'PUT',
+        path: '/jira/rest/api/2/issue/PROJ-1',
+        text: '<html><body>Request blocked</body></html>',
+        headers: { 'content-type': 'text/html;charset=UTF-8' },
+      },
+      { method: 'GET', path: '/jira/rest/api/2/myself', text: 'RUNNING' },
+      {
+        method: 'POST',
+        path: '/jira/rest/api/2/issue/PROJ-1/attachments',
+        text: '<html>login</html>',
+        headers: { 'content-type': 'text/html' },
+      },
+    ]);
+    const { c } = client(fetch);
+    await expect(c.put('/rest/api/2/issue/PROJ-1', { fields: {} })).rejects.toMatchObject({
+      code: 'http',
+      http: 200,
+      message: expect.stringContaining(
+        'with a text/html body that is not JSON (<html><body>Request'
+      ),
+      request: { method: 'PUT', url: '/jira/rest/api/2/issue/PROJ-1' },
+    });
+    await expect(c.get('/rest/api/2/myself')).rejects.toMatchObject({ code: 'http' });
+    await expect(
+      c.uploadMultipart('/rest/api/2/issue/PROJ-1/attachments', [
+        { field: 'file', data: 'hello', filename: 'note.txt' },
+      ])
+    ).rejects.toMatchObject({ code: 'http', request: { method: 'POST' } });
+  });
+
+  it('reads a JSON body even when the server labels it as text', async () => {
+    const fetch = fakeFetch([
+      {
+        path: '/jira/rest/api/2/myself',
+        text: '{"name":"jsmith"}',
+        headers: { 'content-type': 'text/plain' },
+      },
+    ]);
+    const { c } = client(fetch);
+    expect(await c.get('/rest/api/2/myself')).toEqual({ name: 'jsmith' });
   });
 
   it('passes the Jira envelope through verbatim on 400 with the request path', async () => {

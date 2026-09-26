@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { LassiError } from '@wonna/lassi-core';
-import { renderComments, wikiToMarkdown } from '@wonna/lassi-jira';
+import { assertCommentId, renderComments, wikiToMarkdown } from '@wonna/lassi-jira';
 import type { CliDeps } from '../../deps.js';
 import { guardWrite } from '../../guard-write.js';
 import { readBodyInput, type BodySource } from '../../input/body.js';
@@ -103,13 +103,14 @@ export function registerComment(jira: Command, deps: CliDeps, session: Session):
   attach<[string, string], BodySource>(edit, deps, session, {
     kind: 'write',
     async run(ctx, [keyArg, id], opts) {
+      assertCommentId(id);
       const key = await resolveIssueKey(ctx, keyArg);
       const client = await jiraClient(ctx);
       const markdown = (await readBodyInput(deps, opts, { required: true })) ?? '';
       const wiki = await markdownBodyToWiki(ctx, client, markdown);
       const preview = {
         method: 'PUT' as const,
-        path: `/rest/api/2/issue/${key}/comment/${encodeURIComponent(id)}`,
+        path: `/rest/api/2/issue/${key}/comment/${id}`,
         payloadLabel: 'body (wiki markup)',
         payload: wiki,
       };
@@ -126,6 +127,7 @@ export function registerComment(jira: Command, deps: CliDeps, session: Session):
   attach<[string, string], { any?: boolean }>(del, deps, session, {
     kind: 'write',
     async run(ctx, [keyArg, id], opts) {
+      assertCommentId(id);
       const key = await resolveIssueKey(ctx, keyArg);
       const client = await jiraClient(ctx);
       const existing = await client.getComment(key, id);
@@ -146,7 +148,7 @@ export function registerComment(jira: Command, deps: CliDeps, session: Session):
       }
       const preview = {
         method: 'DELETE' as const,
-        path: `/rest/api/2/issue/${key}/comment/${encodeURIComponent(id)}`,
+        path: `/rest/api/2/issue/${key}/comment/${id}`,
         payloadLabel: 'comment',
         payload: `${id} by ${author}, ${existing.created}`,
       };

@@ -94,27 +94,26 @@ const RENAMED_KEYS: Readonly<Record<string, string>> = {
 /**
  * What a workspace `.lassi.json` may set. The file ships inside a checked-out repository,
  * so it is untrusted input: it carries team conventions, but it may not decide which host a request
- * goes to, which file is read as the credential, or whether the credential warnings are shown.
+ * goes to, which credential it carries (inline or read from a file), or whether the credential
+ * warnings are shown.
  * An entry ending in `.` matches a whole subtree.
  *
  * This is an allow-list rather than a deny-list so that a key added to the schema later stays out of
- * the workspace layer until someone decides it belongs there. An inline `jira.token` is allowed
- * through on purpose: it cannot redirect anything, and `doctor`'s workspace-secrets check is what
- * tells the user to move it.
+ * the workspace layer until someone decides it belongs there. Inline credentials (`jira.token`,
+ * `confluence.token`, `embeddings.apiKey`) stay out too: a token decides whose identity every
+ * request carries, and it outranks the user's own `tokenFile`, so a cloned repository could
+ * otherwise post the user's content as somebody else without a word on stderr.
  */
 const WORKSPACE_ALLOWED: readonly string[] = [
-  'jira.token',
   'jira.fields.',
   'jira.defaultProject',
   'jira.branchPattern',
   'jira.templates.',
-  'confluence.token',
   'confluence.defaultSpace',
   'confluence.downloadUrlSuffix',
   'output.',
   'attachments.',
   'http.',
-  'embeddings.apiKey',
   'embeddings.model',
   'embeddings.apiVersion',
   'embeddings.dimensions',
