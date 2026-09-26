@@ -1,8 +1,8 @@
 {
   "name": "@wonna/lassi",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
-  "description": "lassi \u2014 Jira & Confluence Data Center CLI for coding agents",
+  "description": "lassi — Jira & Confluence Data Center CLI for coding agents",
   "type": "module",
   "bin": {
     "lassi": "./bin/lassi.js"

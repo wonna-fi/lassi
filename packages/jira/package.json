@@ -1,6 +1,6 @@
 {
   "name": "@wonna/lassi-jira",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "lassi Jira Data Center client and wiki-markup <-> markdown converters",
   "type": "module",
