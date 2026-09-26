@@ -1,6 +1,6 @@
 {
   "name": "lassi-workspace",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "lassi: Jira & Confluence Data Center CLI for coding agents (workspace root)",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@wonna/lassi-search",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "lassi local semantic search: markdown chunking, OpenAI-compatible embeddings client, flat vector index",
   "type": "module",

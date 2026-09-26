@@ -1,6 +1,6 @@
 {
   "name": "@wonna/lassi-confluence",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "lassi Confluence Data Center client and storage-format <-> markdown converters",
   "type": "module",

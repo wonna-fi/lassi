@@ -1,6 +1,6 @@
 {
   "name": "@wonna/lassi-core",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "lassi core: config, auth, HTTP client, error contract, markdown pivot, logging",
   "type": "module",
