@@ -9,7 +9,7 @@ import {
   type HttpClientOptions,
   type Logger,
 } from '@wonna/lassi-core';
-import { assertIssueKey } from './keys.js';
+import { assertCommentId, assertIssueKey } from './keys.js';
 import { normalizeLinks } from './links.js';
 import { CreatemetaResolver, editmeta, listFields, withIds } from './meta.js';
 import type {
@@ -280,7 +280,7 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
     readComments: (key, requested = 'all') =>
       readComments((opts) => client.listComments(key, opts), requested),
     getComment: async (key, id) =>
-      http.get<JiraComment>(`${issuePath(key)}/comment/${encodeURIComponent(id)}`, {
+      http.get<JiraComment>(`${issuePath(key)}/comment/${assertCommentId(id)}`, {
         context: { product: 'jira', issueKey: key, operation: 'comment' },
       }),
     addComment: async (key, body) =>
@@ -291,12 +291,12 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
       ),
     editComment: async (key, id, body) =>
       http.put<JiraComment>(
-        `${issuePath(key)}/comment/${encodeURIComponent(id)}`,
+        `${issuePath(key)}/comment/${assertCommentId(id)}`,
         { body },
         { context: { product: 'jira', issueKey: key, operation: 'comment' } }
       ),
     async deleteComment(key, id) {
-      await http.delete(`${issuePath(key)}/comment/${encodeURIComponent(id)}`, {
+      await http.delete(`${issuePath(key)}/comment/${assertCommentId(id)}`, {
         context: { product: 'jira', issueKey: key, operation: 'comment' },
       });
     },

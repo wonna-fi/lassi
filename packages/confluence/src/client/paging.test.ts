@@ -123,7 +123,7 @@ describe('convertBody', () => {
     ]);
     await expect(c.convertBody('<p>x</p>', 'storage', 'view')).rejects.toMatchObject({
       code: 'http',
-      message: expect.stringContaining('answered without a body'),
+      message: expect.stringContaining('text/html body that is not JSON'),
       hint: expect.stringContaining('SSO login page'),
     });
   });

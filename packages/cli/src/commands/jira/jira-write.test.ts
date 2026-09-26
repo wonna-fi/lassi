@@ -315,6 +315,23 @@ describe('lassi jira comment add|edit|delete', () => {
     expect(await t.run(['jira', 'comment', 'add', 'proj-1', '--body', 'x'])).toBe(2);
     expect(t.fetch.calls).toHaveLength(0);
   });
+
+  it.each([
+    ['delete', 'PROJ-123', '..', '--any'],
+    ['delete', 'PROJ-123', '.', '--any', '--dry-run'],
+    ['edit', 'PROJ-123', '..', '--body', 'x'],
+    ['edit', 'PROJ-123', '..', '--body', 'x', '--dry-run'],
+    ['edit', 'PROJ-123', '10001x', '--body', 'x'],
+  ])('refuses comment %s with a non-numeric id before any request: %s %s', async (...args) => {
+    const t = program();
+    expect(await t.run(['jira', 'comment', ...args])).toBe(2);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'usage',
+      message: expect.stringContaining('not a Jira comment id'),
+    });
+    expect(t.fetch.calls).toHaveLength(0);
+    expect(t.stdout()).toBe('');
+  });
 });
 
 describe('lassi jira issue create', () => {
@@ -481,6 +498,32 @@ describe('lassi jira issue update', () => {
     );
     // The fake server did not persist the change, so the rewrite restores the server's summary.
     expect(await t.fs.readFile(path)).toContain('summary: Login page throws 500 on empty password');
+  });
+
+  it('fails and keeps the edited file when a proxy answers the PUT with a 200 page', async () => {
+    const t = program({
+      routes: [
+        {
+          method: 'PUT',
+          path: '/rest/api/2/issue/PROJ-123',
+          text: '<html><body>Request blocked</body></html>',
+          headers: { 'content-type': 'text/html' },
+        },
+      ],
+    });
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md'])).toBe(0);
+    const path = '/home/u/proj/work/PROJ-123.md';
+    const edited = (await t.fs.readFile(path)).replace(
+      'summary: Login page throws 500 on empty password',
+      'summary: New summary'
+    );
+    await t.fs.writeFile(path, edited);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--file', 'work/PROJ-123.md'])).toBe(
+      1
+    );
+    expect(lastJsonLine(t.stderr())).toMatchObject({ code: 'http', http: 200 });
+    expect(t.stdout()).not.toContain('updated PROJ-123');
+    expect(await t.fs.readFile(path)).toBe(edited);
   });
 
   it('exits 0 with "no changes" and no PUT when the file matches the cache', async () => {

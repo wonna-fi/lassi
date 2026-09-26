@@ -53,4 +53,28 @@ describe('error contract through a real command', () => {
     expect(t.stderr()).not.toContain('jira-secret-token');
     expect(t.stdout()).toContain('token *** rejected');
   });
+
+  it('refuses a token file with a second line before sending, and never prints the token', async () => {
+    const env = {
+      ...BOTH_PRODUCTS_ENV,
+      LASSI_JIRA_TOKEN: undefined,
+      LASSI_JIRA_TOKEN_FILE: '/t/jira.txt',
+    };
+    const files = { '/t/jira.txt': 'jira-file-pat-1234\n# created 2026-01-01\n' };
+    const get = makeTestProgram({ env, files });
+    expect(await get.run(['jira', 'issue', 'get', 'PROJ-1'])).toBe(3);
+    expect(lastJsonLine(get.stderr())).toMatchObject({
+      code: 'auth',
+      message:
+        'token file has a line break or another control character inside the token: /t/jira.txt',
+    });
+    expect(get.fetch.calls).toHaveLength(0);
+
+    const doctor = makeTestProgram({ env, files, routes: [{ path: '/status', text: 'ok' }] });
+    await doctor.run(['doctor', '--json']);
+    for (const t of [get, doctor]) {
+      expect(t.stdout()).not.toContain('jira-file-pat');
+      expect(t.stderr()).not.toContain('jira-file-pat');
+    }
+  });
 });

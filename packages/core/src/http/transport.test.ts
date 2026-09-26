@@ -79,6 +79,44 @@ describe('redirects', () => {
   });
 });
 
+describe('dot segments', () => {
+  it.each([
+    '/rest/api/2/issue/PROJ-1/comment/..',
+    '/rest/api/2/issue/PROJ-1/comment/.',
+    '/rest/api/content/%2e%2E',
+    '/rest/api/content/.%2e/child/page',
+    '/rest/api/2/issue/PROJ-1/comment/..\\x',
+    `${BASE}/rest/api/2/issue/PROJ-1/comment/..`,
+    `${BASE}/rest/api/content/%2E?expand=version`,
+    '/rest/api/2/issue/PROJ-1/comment/.\t.',
+    '/rest/api/2/issue/PROJ-1/comment/.\r\n.',
+    '/rest/api/2/issue/PROJ-1/comment/.. ',
+    '/rest/api/2/issue/PROJ-1/comment/..\u0000',
+    `${BASE}/rest/api/2/issue/PROJ-1/comment/%2e\n%2e`,
+  ])('refuses %j before anything is sent', async (path) => {
+    const { c, fetch } = client([{ path: /.*/, json: {} }]);
+    await expect(c.delete(path)).rejects.toMatchObject({
+      code: 'usage',
+      message: expect.stringContaining('path segment would address a different resource'),
+    });
+    expect(fetch.calls).toHaveLength(0);
+  });
+
+  it('leaves dots inside a segment and in the query alone', async () => {
+    const { c, fetch } = client([{ path: /.*/, json: {} }]);
+    await c.get('/download/attachments/1/.env');
+    await c.get('/download/attachments/1/notes..txt');
+    await c.get('/rest/api/content/search', { query: { cql: 'title ~ "../x"' } });
+    await c.get(`${BASE}/rest/api/2/issue/PROJ-1?fields=summary#..`);
+    expect(fetch.calls.map((call) => call.url.pathname)).toEqual([
+      '/download/attachments/1/.env',
+      '/download/attachments/1/notes..txt',
+      '/rest/api/content/search',
+      '/rest/api/2/issue/PROJ-1',
+    ]);
+  });
+});
+
 describe('a 200 that is not JSON', () => {
   it('is an HTTP error naming the likely cause, not a parser crash', async () => {
     const { c } = client([

@@ -623,6 +623,22 @@ describe('lassi confluence page update', () => {
     const nothing = program(routes);
     expect(await nothing.run(['confluence', 'page', 'update', '123456'])).toBe(2);
   });
+
+  it.each(['.', '..'])(
+    'refuses page update %s instead of writing the content collection',
+    async (id) => {
+      const { routes, state } = server();
+      for (const extra of [[], ['--dry-run']]) {
+        const t = program(routes);
+        expect(await t.run(['confluence', 'page', 'update', id, '--title', 'New', ...extra])).toBe(
+          2
+        );
+        expect(lastJsonLine(t.stderr())).toMatchObject({ code: 'usage' });
+        expect(t.fetch.calls).toHaveLength(0);
+      }
+      expect(state.puts).toHaveLength(0);
+    }
+  );
 });
 
 describe('lassi confluence comment add and delete', () => {

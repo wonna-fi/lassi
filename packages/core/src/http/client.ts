@@ -83,8 +83,33 @@ export interface HttpClient {
   ): Promise<T>;
 }
 
+/**
+ * The URL parser resolves `.` and `..` segments (`%2e` counts as a dot, `\` as a slash), and
+ * `encodeURIComponent` leaves dots alone, so an identifier of `..` would quietly move a request to
+ * the parent resource: a comment DELETE would become an issue DELETE.
+ */
+function assertNoDotSegments(path: string): void {
+  // The parser drops tabs and newlines anywhere, and controls and spaces at either end, before it
+  // resolves dots, so `.\t.` and `.. ` still mean `..`. A same-origin absolute URL is checked on its
+  // raw path too: `new URL` would normalise it away.
+  const pathname =
+    path
+      .replace(/[\t\n\r]/g, '')
+      .replace(/^[\p{Cc} ]+|[\p{Cc} ]+$/gu, '')
+      .replace(/^https?:\/\/[^/?#\\]*/i, '')
+      .split(/[?#]/, 1)[0] ?? '';
+  if (pathname.split(/[/\\]/).some((segment) => /^(?:\.|%2e){1,2}$/i.test(segment))) {
+    throw new LassiError(
+      'usage',
+      `refusing to request ${path}: a "." or ".." path segment would address a different resource`,
+      { hint: 'check the id or key passed to the command' }
+    );
+  }
+}
+
 function buildUrl(baseUrl: string, path: string, query?: Record<string, QueryValue>): URL {
   const base = new URL(baseUrl);
+  assertNoDotSegments(path);
   let url: URL;
   if (/^https?:\/\//i.test(path)) {
     url = new URL(path);
@@ -436,31 +461,32 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
       readBody: true,
       retryable: true,
     });
-    const contentType = response.headers.get('content-type') ?? '';
     if (response.status === 204 || text === undefined || text.length === 0) return undefined as T;
-    if (!contentType.includes('json')) return undefined as T;
-    return parseJsonBody<T>(text, response.status, {
-      method,
-      url: buildUrl(baseUrl, path).pathname,
-    });
+    return parseJsonBody<T>(text, response, { method, url: buildUrl(baseUrl, path).pathname });
   }
 
-  /** A 200 whose JSON does not parse is an interstitial or a truncated body, not a bug here. */
+  /**
+   * A 2xx whose body does not parse as JSON is an SSO, WAF or proxy page, or a truncated body. It is
+   * never an empty success, whatever its content type: reading it as `undefined` would report a
+   * write the server never saw, or an empty result set for a read.
+   */
   function parseJsonBody<T>(
     text: string,
-    status: number,
+    response: Response,
     request: { method: string; url: string }
   ): T {
+    const { status } = response;
     try {
       return JSON.parse(text) as T;
     } catch {
+      const type = response.headers.get('content-type')?.split(';')[0]?.trim();
       throw new LassiError(
         'http',
-        `the server answered ${status} with a body that is not JSON (${text.slice(0, 80).replace(/\s+/g, ' ').trim()})`,
+        `the server answered ${status} with a ${type ? `${type} ` : ''}body that is not JSON (${text.slice(0, 80).replace(/\s+/g, ' ').trim()})`,
         {
           http: status,
           request,
-          hint: 'the instance may have answered with an SSO login page; check the URL and the token with `lassi doctor`',
+          hint: 'the instance may have answered with an SSO login page or a proxy page instead of the API; check the URL and the token with `lassi doctor`',
           context: opts.product ? { product: opts.product } : {},
         }
       );
@@ -557,10 +583,8 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
         readBody: true,
         retryable: false,
       });
-      const contentType = response.headers.get('content-type') ?? '';
-      if (text === undefined || text.length === 0 || !contentType.includes('json'))
-        return undefined as T;
-      return parseJsonBody<T>(text, response.status, {
+      if (text === undefined || text.length === 0) return undefined as T;
+      return parseJsonBody<T>(text, response, {
         method: 'POST',
         url: buildUrl(baseUrl, path).pathname,
       });

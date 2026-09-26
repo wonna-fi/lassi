@@ -1,5 +1,6 @@
 export * from './client/types.js';
 export {
+  assertCommentId,
   assertIssueKey,
   compileBranchPattern,
   ISSUE_KEY,

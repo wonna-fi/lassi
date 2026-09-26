@@ -28,7 +28,8 @@ function setup() {
       path: '/rest/api/2/search',
       handler: () =>
         fail
-          ? { status: 503, json: { errorMessages: ['temporarily unavailable'] } }
+          ? // A server that echoes the credential back in its error text.
+            { status: 503, json: { errorMessages: ['unavailable for token jira-secret-token'] } }
           : {
               json: {
                 issues: selected.map(issue),
@@ -108,8 +109,9 @@ describe('export archive coverage', () => {
     s.fail();
     expect(await s.p.run(args)).toBe(1);
     expect(await s.manifest()).toMatchObject({
-      lastRun: { complete: false, failed: { pagination: expect.any(String) } },
+      lastRun: { complete: false, failed: { pagination: 'unavailable for token ***' } },
     });
+    expect(await s.p.fs.readFile(`${dir}/manifest.json`)).not.toContain('jira-secret-token');
     expect(await s.p.fs.exists(`${dir}/PROJ-1.md`)).toBe(true);
   });
 

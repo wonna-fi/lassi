@@ -225,7 +225,8 @@ describe('doctor', () => {
         '/home/u/proj/.lassi.json': JSON.stringify({
           jira: {
             fields: { team: 'customfield_10001', bogus: 'customfield_10009' },
-            token: 'oops-secret',
+            // A PAT pasted where a workspace file may put text; inline token keys fail to load.
+            templates: { bug: { summary: 'lassi-test-not-a-real-token-0000000000000000' } },
           },
         }),
       },
@@ -240,7 +241,7 @@ describe('doctor', () => {
     expect(rows.find((r) => r.name === 'Proxy')).toMatchObject({ status: 'WARN' });
     expect(rows.find((r) => r.name === 'Workspace config secrets')).toMatchObject({
       status: 'WARN',
-      detail: expect.stringContaining('jira.token'),
+      detail: expect.stringContaining('jira.templates.bug.summary'),
     });
     expect(rows.find((r) => r.name === 'alias team')?.status).toBe('PASS');
     expect(rows.find((r) => r.name === 'alias bogus')?.status).toBe('WARN');

@@ -90,8 +90,9 @@ export function registerIssueExport(issue: Command, deps: CliDeps, session: Sess
         for (;;) {
           const step = await pages.next().catch(async (err: unknown) => {
             // A retry must recognize the files written before this page request failed.
-            manifest.lastRun.failed['pagination'] =
-              err instanceof Error ? err.message : String(err);
+            manifest.lastRun.failed['pagination'] = ctx.redact(
+              err instanceof Error ? err.message : String(err)
+            );
             manifest.lastRun.finishedAt = deps.now().toISOString();
             await writeExportManifest(deps.fs, dir, manifest);
             throw err;
@@ -156,8 +157,9 @@ export function registerIssueExport(issue: Command, deps: CliDeps, session: Sess
               };
             } catch (err) {
               stats.failed += 1;
-              manifest.lastRun.failed[fetched.key] =
-                err instanceof Error ? err.message : String(err);
+              manifest.lastRun.failed[fetched.key] = ctx.redact(
+                err instanceof Error ? err.message : String(err)
+              );
               if (isLassiError(err) && err.code === 'conflict') {
                 conflicts.set(fetched.key, err.message);
                 continue;
