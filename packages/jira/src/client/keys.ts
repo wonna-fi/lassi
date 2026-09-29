@@ -17,6 +17,14 @@ export function assertIssueKey(value: string): string {
   return value;
 }
 
+/** Link ids are decimal, like comment ids: they name a path segment of `/issueLink/{id}`. */
+export function assertLinkId(value: string): string {
+  if (!/^\d+$/.test(value)) {
+    throw new LassiError('usage', `not a Jira link id: ${value} (expected a number, e.g. 10001)`);
+  }
+  return value;
+}
+
 /** Comment ids are decimal; `..` would otherwise resolve `…/comment/..` to the issue itself. */
 export function assertCommentId(value: string): string {
   if (!/^\d+$/.test(value)) {
