@@ -304,6 +304,26 @@ describe('createJiraClient', () => {
     expect(await c.fields()).toEqual([{ id: 'summary', name: 'Summary', custom: false }]);
   });
 
+  it('waits longer for editmeta and does not repeat it after a timeout', async () => {
+    let calls = 0;
+    const c = createJiraClient({
+      baseUrl: BASE,
+      token: 'pat-token-1234',
+      timeoutMs: 5,
+      fetch: async () => {
+        calls += 1;
+        throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+      },
+      random: () => 0,
+      sleep: async () => {},
+    });
+    await expect(c.editmeta('PROJ-1')).rejects.toMatchObject({
+      code: 'timeout',
+      message: 'request timed out after 180000 ms',
+    });
+    expect(calls).toBe(1);
+  });
+
   it('lists comments newest-first when asked and posts wiki bodies verbatim', async () => {
     const { c, fetch } = client([
       {

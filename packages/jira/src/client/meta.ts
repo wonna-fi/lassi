@@ -261,9 +261,18 @@ export class CreatemetaResolver {
   }
 }
 
+/**
+ * Jira computes allowed values for every field on the edit screen, so a project with many components
+ * or options can take minutes to answer. The deadline is raised to match, and a timeout is final:
+ * another attempt would only make the server compute the same answer again.
+ */
+export const EDITMETA_TIMEOUT_MS = 180_000;
+
 export async function editmeta(http: HttpClient, key: string): Promise<JiraFieldMetaMap> {
   const raw = await http.get<Editmeta>(`/rest/api/2/issue/${encodeURIComponent(key)}/editmeta`, {
     context: { product: 'jira', issueKey: key, operation: 'update' },
+    minTimeoutMs: EDITMETA_TIMEOUT_MS,
+    retryOnTimeout: false,
   });
   return withIds(raw?.fields);
 }

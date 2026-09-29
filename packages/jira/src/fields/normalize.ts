@@ -9,6 +9,39 @@ const NAMED_TYPES = new Set([
   'version',
 ]);
 
+/** Schemas of the standard editable fields, for when no field metadata was fetched. */
+const STANDARD_SCHEMA: Record<string, JiraFieldSchema> = {
+  summary: { type: 'string' },
+  environment: { type: 'string' },
+  issuetype: { type: 'issuetype' },
+  priority: { type: 'priority' },
+  assignee: { type: 'user' },
+  labels: { type: 'array', items: 'string' },
+  components: { type: 'array', items: 'component' },
+  fixVersions: { type: 'array', items: 'version' },
+  versions: { type: 'array', items: 'version' },
+  duedate: { type: 'date' },
+  reporter: { type: 'user' },
+};
+
+export function standardSchema(fieldId: string): JiraFieldSchema | undefined {
+  return Object.hasOwn(STANDARD_SCHEMA, fieldId) ? STANDARD_SCHEMA[fieldId] : undefined;
+}
+
+/** The types `scalarToApiValue` checks against the field's allowed values. */
+const VALIDATED_TYPES = new Set(['option', 'priority', 'issuetype', 'resolution', 'status']);
+
+/**
+ * Whether converting a value of this schema needs the field's live metadata: its allowed values
+ * validate the value and give its canonical spelling, or there is no schema to convert with.
+ * Components and versions do not: without metadata they are sent by name, which Jira resolves.
+ */
+export function needsFieldMeta(schema: JiraFieldSchema | undefined): boolean {
+  if (schema === undefined) return true;
+  const type = schema.type === 'array' ? schema.items : schema.type;
+  return type !== undefined && VALIDATED_TYPES.has(type);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
