@@ -1,6 +1,13 @@
 import type { Command } from 'commander';
 import { LassiError } from '@wonna/lassi-core';
-import { resolveLinkDirection, type JiraFieldDef, type JiraLinkType } from '@wonna/lassi-jira';
+import {
+  findLinks,
+  issueLinkRequest,
+  resolveLinkDirection,
+  type JiraFieldDef,
+  type JiraIssueLink,
+  type JiraLinkType,
+} from '@wonna/lassi-jira';
 import type { Context } from '../../context.js';
 import type { CliDeps } from '../../deps.js';
 import { guardWrite } from '../../guard-write.js';
@@ -83,7 +90,8 @@ export function renderLinkTypes(types: JiraLinkType[], opts: { md: boolean }): s
     '',
     '`lassi jira link create A B --type "<phrase>"` accepts the outward phrase or the type name',
     '(A <outward> B) or the inward phrase (A <inward> B, direction flipped). `--dry-run` prints the',
-    'resolved sentence.',
+    'resolved sentence. `lassi jira link delete A B --type "<phrase>"` removes the link that',
+    '`lassi jira link list A` shows as A <phrase> B.',
     '',
     table,
   ].join('\n');
@@ -152,11 +160,8 @@ export function registerReference(jira: Command, deps: CliDeps, session: Session
       if (from === to) throw new LassiError('usage', `cannot link ${from} to itself`);
       const client = await jiraClient(ctx);
       const resolved = resolveLinkDirection(await client.getLinkTypes(), opts.type, from, to);
-      const body = {
-        type: { name: resolved.type.name },
-        outwardIssue: { key: resolved.outwardKey },
-        inwardIssue: { key: resolved.inwardKey },
-      };
+      // The same body createLink sends, so the preview shows Jira's field names as they go out.
+      const body = issueLinkRequest(resolved.type.name, resolved.sourceKey, resolved.targetKey);
       // The dry run prints the resolved sentence, the common direction mistake made visible.
       const preview = {
         method: 'POST' as const,
@@ -168,10 +173,63 @@ export function registerReference(jira: Command, deps: CliDeps, session: Session
       if (guardWrite(ctx, preview) === 'dry-run') return { data: dryRunData(preview) };
       await client.createLink({
         typeName: resolved.type.name,
-        outwardKey: resolved.outwardKey,
-        inwardKey: resolved.inwardKey,
+        sourceKey: resolved.sourceKey,
+        targetKey: resolved.targetKey,
       });
       return { markdown: `${resolved.sentence}\n`, data: { ...body, sentence: resolved.sentence } };
+    },
+  });
+
+  const remove = link
+    .command('delete <KEY1> <KEY2>')
+    .description(
+      'delete the link that `link list KEY1` shows as KEY1 <phrase> KEY2; --type takes the same phrases as create'
+    )
+    .requiredOption('--type <NAME>', 'link type name or direction phrase');
+  attach<[string, string], { type: string }>(remove, deps, session, {
+    kind: 'write',
+    async run(ctx, [fromArg, toArg], opts) {
+      const from = await resolveIssueKey(ctx, fromArg);
+      const to = await resolveIssueKey(ctx, toArg);
+      if (from === to) throw new LassiError('usage', `${from} cannot be linked to itself`);
+      const client = await jiraClient(ctx);
+      const resolved = resolveLinkDirection(await client.getLinkTypes(), opts.type, from, to);
+      const links = await client.listLinks(from);
+      const matches = findLinks(links, resolved, from);
+      const context = { product: 'jira' as const, issueKey: from, operation: 'link' as const };
+      if (matches.length === 0) {
+        // A link created the other way round is the usual reason: name the ones that do exist.
+        const between = links
+          .filter((l) => l.otherKey === to)
+          .map((l) => `${from} ${l.description} ${to}`);
+        throw new LassiError('not_found', `no link ${resolved.sentence}`, {
+          hint:
+            between.length > 0
+              ? `${from} and ${to} are linked as: ${between.join('; ')}; pass that phrase to --type`
+              : `run \`lassi jira link list ${from}\` to see its links`,
+          context,
+        });
+      }
+      if (matches.length > 1) {
+        throw new LassiError(
+          'validation',
+          `${matches.length} links match ${resolved.sentence} (ids ${matches.map((l) => l.id).join(', ')})`,
+          { hint: 'remove the extra links in Jira; lassi deletes one link at a time', context }
+        );
+      }
+      const match = matches[0] as JiraIssueLink;
+      const preview = {
+        method: 'DELETE' as const,
+        path: `/rest/api/2/issueLink/${match.id}`,
+        payloadLabel: 'link',
+        payload: `${match.id}: ${resolved.sentence}`,
+      };
+      if (guardWrite(ctx, preview) === 'dry-run') return { data: dryRunData(preview) };
+      await client.deleteLink(match.id);
+      return {
+        markdown: `deleted link: ${resolved.sentence}\n`,
+        data: { id: match.id, type: resolved.type.name, sentence: resolved.sentence },
+      };
     },
   });
 

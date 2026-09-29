@@ -1077,8 +1077,8 @@ describe('lassi jira link create', () => {
     ).toBe(0);
     expect(JSON.parse(writes(outward)[0]?.bodyText ?? '')).toEqual({
       type: { name: 'Blocks' },
-      outwardIssue: { key: 'PROJ-1' },
-      inwardIssue: { key: 'PROJ-2' },
+      inwardIssue: { key: 'PROJ-1' },
+      outwardIssue: { key: 'PROJ-2' },
     });
     expect(outward.stdout()).toBe('PROJ-1 blocks PROJ-2\n');
 
@@ -1096,7 +1096,7 @@ describe('lassi jira link create', () => {
       ])
     ).toBe(0);
     expect(inward.stdout()).toBe(
-      'DRY RUN — nothing sent\nPOST /rest/api/2/issueLink\nPROJ-1 is blocked by PROJ-2\n--- link (json) ---\n{\n  "type": {\n    "name": "Blocks"\n  },\n  "outwardIssue": {\n    "key": "PROJ-2"\n  },\n  "inwardIssue": {\n    "key": "PROJ-1"\n  }\n}\n'
+      'DRY RUN — nothing sent\nPOST /rest/api/2/issueLink\nPROJ-1 is blocked by PROJ-2\n--- link (json) ---\n{\n  "type": {\n    "name": "Blocks"\n  },\n  "inwardIssue": {\n    "key": "PROJ-2"\n  },\n  "outwardIssue": {\n    "key": "PROJ-1"\n  }\n}\n'
     );
     expect(writes(inward)).toHaveLength(0);
   });
@@ -1113,6 +1113,240 @@ describe('lassi jira link create', () => {
     const none = program();
     expect(await none.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2'])).toBe(2);
     expect([unknown, none].flatMap((t) => writes(t))).toHaveLength(0);
+  });
+});
+
+type StoredLink = {
+  type: { id: string; name: string; inward: string; outward: string };
+  source: string;
+  target: string;
+};
+
+/**
+ * A Jira that stores links the way Jira does. `POST /issueLink` makes `inwardIssue` the source of the
+ * outward phrase ("inwardIssue blocks outwardIssue"). An issue's `issuelinks` then show the other end
+ * as `outwardIssue` on the source and as `inwardIssue` on the target. Create and list agree only when
+ * lassi sends what Jira expects; the fixtures above cannot tell.
+ */
+function linkingJira(): Route[] {
+  const types = [
+    { id: '1', name: 'Blocks', inward: 'is blocked by', outward: 'blocks' },
+    { id: '2', name: 'Issue split', inward: 'split from', outward: 'split to' },
+    { id: '3', name: 'Relates', inward: 'relates to', outward: 'relates to' },
+  ];
+  const links = new Map<string, StoredLink>();
+  let next = 100;
+  const issue = (key: string) => ({
+    id: key.slice(key.indexOf('-') + 1),
+    key,
+    fields: {
+      issuelinks: [...links].flatMap(([id, l]): Array<Record<string, unknown>> => {
+        if (l.source === key)
+          return [{ id, type: l.type, outwardIssue: { id: '0', key: l.target } }];
+        if (l.target === key)
+          return [{ id, type: l.type, inwardIssue: { id: '0', key: l.source } }];
+        return [];
+      }),
+    },
+  });
+  return [
+    { path: '/rest/api/2/issueLinkType', json: { issueLinkTypes: types } },
+    {
+      method: 'POST',
+      path: '/rest/api/2/issueLink',
+      handler: (call) => {
+        const body = JSON.parse(call.bodyText ?? '{}') as {
+          type: { name: string };
+          inwardIssue: { key: string };
+          outwardIssue: { key: string };
+        };
+        const type = types.find((t) => t.name === body.type.name);
+        if (!type) return { status: 404, json: { errorMessages: ['No issue link type'] } };
+        links.set(String(next++), {
+          type,
+          source: body.inwardIssue.key,
+          target: body.outwardIssue.key,
+        });
+        return { status: 201 };
+      },
+    },
+    {
+      method: 'DELETE',
+      path: /^\/rest\/api\/2\/issueLink\/\d+$/,
+      handler: (call) =>
+        links.delete(call.url.pathname.split('/').pop() ?? '')
+          ? { status: 204 }
+          : { status: 404, json: { errorMessages: ['No issue link with that id'] } },
+    },
+    {
+      method: 'GET',
+      path: /^\/rest\/api\/2\/issue\/PROJ-[12](\?|$)/,
+      handler: (call) => ({ json: issue(call.url.pathname.split('/').pop() ?? '') }),
+    },
+  ];
+}
+
+/** `link list KEY` as sentences, the way the table prints them. */
+async function listed(routes: Route[], key: string): Promise<string[]> {
+  const t = program({ routes });
+  expect(await t.run(['jira', 'link', 'list', key, '--json'])).toBe(0);
+  const data = JSON.parse(t.stdout()) as {
+    links: Array<{ description: string; otherKey: string }>;
+  };
+  return data.links.map((l) => `${key} ${l.description} ${l.otherKey}`);
+}
+
+describe("lassi jira link create|delete against Jira's link semantics", () => {
+  it('creates the link it prints, seen the same way from both issues', async () => {
+    const jira = linkingJira();
+    const t = program({ routes: jira });
+    expect(await t.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'split to'])).toBe(
+      0
+    );
+    expect(t.stdout()).toBe('PROJ-1 split to PROJ-2\n');
+    expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 split to PROJ-2']);
+    expect(await listed(jira, 'PROJ-2')).toEqual(['PROJ-2 split from PROJ-1']);
+
+    const flipped = linkingJira();
+    expect(
+      await program({ routes: flipped }).run([
+        'jira',
+        'link',
+        'create',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'split from',
+      ])
+    ).toBe(0);
+    expect(await listed(flipped, 'PROJ-1')).toEqual(['PROJ-1 split from PROJ-2']);
+  });
+
+  it('deletes the link named by either issue, and only that one', async () => {
+    const jira = linkingJira();
+    await program({ routes: jira }).run([
+      'jira',
+      'link',
+      'create',
+      'PROJ-1',
+      'PROJ-2',
+      '--type',
+      'blocks',
+    ]);
+    await program({ routes: jira }).run([
+      'jira',
+      'link',
+      'create',
+      'PROJ-1',
+      'PROJ-2',
+      '--type',
+      'split to',
+    ]);
+    const t = program({ routes: jira });
+    expect(
+      await t.run(['jira', 'link', 'delete', 'PROJ-2', 'PROJ-1', '--type', 'split from'])
+    ).toBe(0);
+    expect(t.stdout()).toBe('deleted link: PROJ-2 split from PROJ-1\n');
+    expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 blocks PROJ-2']);
+  });
+
+  it('deletes a symmetric link as listed, whichever way Jira stored it', async () => {
+    const jira = linkingJira();
+    await program({ routes: jira }).run([
+      'jira',
+      'link',
+      'create',
+      'PROJ-2',
+      'PROJ-1',
+      '--type',
+      'relates to',
+    ]);
+    expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 relates to PROJ-2']);
+    const t = program({ routes: jira });
+    expect(
+      await t.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'relates to'])
+    ).toBe(0);
+    expect(await listed(jira, 'PROJ-1')).toEqual([]);
+  });
+
+  it('repairs a link created the wrong way round, naming it when the phrase does not match', async () => {
+    const jira = linkingJira();
+    // What earlier versions stored for `link create PROJ-1 PROJ-2 --type "split to"`.
+    await program({ routes: jira }).run([
+      'jira',
+      'link',
+      'create',
+      'PROJ-1',
+      'PROJ-2',
+      '--type',
+      'split from',
+    ]);
+    const miss = program({ routes: jira });
+    expect(
+      await miss.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'split to'])
+    ).toBe(4);
+    expect(lastJsonLine(miss.stderr())).toMatchObject({
+      code: 'not_found',
+      message: 'no link PROJ-1 split to PROJ-2',
+      hint: 'PROJ-1 and PROJ-2 are linked as: PROJ-1 split from PROJ-2; pass that phrase to --type',
+    });
+    expect(
+      await program({ routes: jira }).run([
+        'jira',
+        'link',
+        'delete',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'split from',
+      ])
+    ).toBe(0);
+    expect(
+      await program({ routes: jira }).run([
+        'jira',
+        'link',
+        'create',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'split to',
+      ])
+    ).toBe(0);
+    expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 split to PROJ-2']);
+  });
+
+  it('previews a delete, and refuses it under read-only, for a self link or an unknown type', async () => {
+    const jira = linkingJira();
+    await program({ routes: jira }).run([
+      'jira',
+      'link',
+      'create',
+      'PROJ-1',
+      'PROJ-2',
+      '--type',
+      'blocks',
+    ]);
+    const dry = program({ routes: jira });
+    expect(
+      await dry.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'blocks', '--dry-run'])
+    ).toBe(0);
+    expect(dry.stdout()).toBe(
+      'DRY RUN — nothing sent\nDELETE /rest/api/2/issueLink/100\n--- link ---\n100: PROJ-1 blocks PROJ-2\n'
+    );
+    const readOnly = program({ routes: jira, env: { LASSI_READ_ONLY: '1' } });
+    expect(
+      await readOnly.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'blocks'])
+    ).toBe(7);
+    const self = program({ routes: jira });
+    expect(await self.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-1', '--type', 'blocks'])).toBe(
+      2
+    );
+    const unknown = program({ routes: jira });
+    expect(
+      await unknown.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'clones'])
+    ).toBe(4);
+    expect([dry, readOnly, self, unknown].flatMap((t) => writes(t))).toHaveLength(0);
+    expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 blocks PROJ-2']);
   });
 });
 

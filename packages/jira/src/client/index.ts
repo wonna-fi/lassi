@@ -9,8 +9,8 @@ import {
   type HttpClientOptions,
   type Logger,
 } from '@wonna/lassi-core';
-import { assertCommentId, assertIssueKey } from './keys.js';
-import { normalizeLinks } from './links.js';
+import { assertCommentId, assertIssueKey, assertLinkId } from './keys.js';
+import { issueLinkRequest, normalizeLinks } from './links.js';
 import { CreatemetaResolver, editmeta, listFields, withIds } from './meta.js';
 import type {
   CreatemetaMode,
@@ -128,7 +128,9 @@ export interface JiraClient {
 
   getLinkTypes(): Promise<JiraLinkType[]>;
   listLinks(key: string): Promise<JiraIssueLink[]>;
-  createLink(req: { typeName: string; outwardKey: string; inwardKey: string }): Promise<void>;
+  /** Links `sourceKey <type.outward> targetKey`, e.g. "PROJ-1 blocks PROJ-2". */
+  createLink(req: { typeName: string; sourceKey: string; targetKey: string }): Promise<void>;
+  deleteLink(id: string): Promise<void>;
 
   getUser(username: string): Promise<JiraUser>;
   /** Unknown usernames (404) are returned, never thrown; other failures propagate. */
@@ -388,13 +390,18 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
     async createLink(req) {
       await http.post(
         '/rest/api/2/issueLink',
-        {
-          type: { name: req.typeName },
-          outwardIssue: { key: assertIssueKey(req.outwardKey) },
-          inwardIssue: { key: assertIssueKey(req.inwardKey) },
-        },
+        issueLinkRequest(
+          req.typeName,
+          assertIssueKey(req.sourceKey),
+          assertIssueKey(req.targetKey)
+        ),
         { context: { product: 'jira', operation: 'link' } }
       );
+    },
+    async deleteLink(id) {
+      await http.delete(`/rest/api/2/issueLink/${assertLinkId(id)}`, {
+        context: { product: 'jira', operation: 'link' },
+      });
     },
 
     async getUser(username) {
