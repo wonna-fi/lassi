@@ -1,6 +1,7 @@
 ---
 title: Error Contract
 type: concept
+last_verified: 2026-09-29
 sources:
   - packages/cli/src/commands/search/index.ts
   - packages/cli/src/commands/skills/install.ts
@@ -11,7 +12,9 @@ sources:
   - packages/core/src/http/client.ts
   - packages/cli/src/run-command.ts
   - packages/cli/src/run.ts
-last_verified: 2026-09-19
+  - packages/cli/src/context.ts
+  - packages/cli/src/commands/jira/export.ts
+  - packages/cli/src/commands/confluence/export.ts
 ---
 
 # Error Contract
@@ -43,6 +46,8 @@ The stable categories and exit codes are:
 | `network`, `tls`, `timeout`, `http`, `internal` | 1 | Connectivity, protocol, unclassified HTTP, or unexpected failures. |
 
 HTTP 401/403 becomes `auth`, 404 becomes `not_found`, 400/422 becomes `validation`, and 409/412 becomes `conflict`; other non-success statuses become `http`. Fetch failures are classified by walking their cause chain for TLS, DNS, refusal, reset, timeout, and abort signals.
+
+A nonempty successful response from a JSON API method must contain valid JSON. A non-JSON 2xx body raises `http`, retains the HTTP status, and hints that an SSO login or proxy page may have answered instead of the API. The response content type does not make such a body an empty success; the request reference stays a method and relative path.
 
 Atlassian response bodies retain useful structured detail. Jira `errors` and `errorMessages`, Confluence `message`, and nested Confluence error translations are copied into the envelope; short unstructured response bodies or status text provide the fallback message.
 
@@ -82,6 +87,8 @@ Message selection prefers the server's top-level message, then its first message
 Rendering uses `error: <message>` for local failures, includes the product and HTTP status for known remote failures, collapses embedded newlines in the human line, and then writes the JSON object on its own line. Commander parse failures already have a human line, so the top-level runner appends only their JSON envelope.
 
 Redaction is an output boundary, not a logging convention. Logger lines, normal command output, dry-run previews, and both error lines pass through the context redactor. Values shorter than four characters are deliberately ignored to avoid replacing ordinary text.
+
+Jira and Confluence bulk exports also redact exception messages before assigning them to `manifest.json`'s `lastRun.failed`, including pagination and per-item failures. That persisted text can be inspected after a partial run, so it uses the same known-secret boundary as output. The active context adds resolved credentials to the redactor before these commands call their clients.
 
 The logger has `silent`, `error`, `warn`, `info`, and `debug` thresholds and emits stable, uncolored `level: message` lines to stderr. HTTP tracing uses it for method, relative path, attempt, response, elapsed time, and retry delay; it never needs a credential, origin, request body, or response body.
 

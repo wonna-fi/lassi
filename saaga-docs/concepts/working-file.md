@@ -15,7 +15,7 @@ sources:
   - packages/core/src/config/load.ts
   - packages/jira/src/issue/{frontmatter,cache,diff}.ts
   - packages/confluence/src/page/{frontmatter,cache}.ts
-last_verified: 2026-09-19
+last_verified: 2026-09-29
 ---
 
 # Working File
@@ -82,7 +82,7 @@ Directory roles remain separate:
 |----------|------|
 | `.lassi/work` | Default workspace area for editable copies. |
 | `.lassi/cache/jira` | Jira JSON baselines keyed by validated issue key. |
-| `.lassi/cache/jira/editmeta` | Jira edit metadata keyed by project key and issue type ID; the reuse rules are in [Jira Domain](./jira-domain.md). |
+| `.lassi/cache/jira/editmeta` | Jira edit metadata in `<project>.<issue-type-id>.json` files; [Jira Domain](./jira-domain.md) owns reuse rules. |
 | `.lassi/cache/confluence` | Versioned storage XML and page JSON sidecars. |
 | configured export root | User-wide archive input to search, with manifest-based protection for local edits. |
 
@@ -103,7 +103,7 @@ Directory roles remain separate:
 ## Reference Implementations
 
 - `packages/cli/src/workfile/schema.ts` - the shared editable/reserved split.
-- `packages/cli/src/workfile/cache.ts` - safe cache names and damaged-cache behavior.
+- `packages/cli/src/workfile/cache.ts` - safe issue and edit-metadata cache paths, damaged-cache handling, and atomic JSON publication.
 - `packages/jira/src/issue/cache.ts` - entity and per-file Jira baselines.
 - `packages/confluence/src/page/cache.ts` - Confluence storage identity and per-file state.
 - `readWorkingFile()` - reference for enforcing the working-file envelope.

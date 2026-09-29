@@ -21,8 +21,8 @@ The concepts the rest of the corpus links to most often. Everything else assumes
 
 - [Runtime Context](./concepts/runtime-context.md) — Effective configuration, credentials, injected host services, and filesystem access for each command.
 - [Markdown Document](./concepts/markdown-document.md) — Canonical mdast and Markdown representation, frontmatter, mentions, and loss-preserving dialect fences.
+- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, fields, comments, attachments, links, transitions, history, and client APIs.
 - [Working File](./concepts/working-file.md) — Editable fields, reserved metadata, cache identity, and local or server drift state.
-- [Search Index](./concepts/search-index.md) — Local semantic-search corpus, chunks, vectors, provenance, compatibility, and query hits.
 
 ## Workflows and Features
 

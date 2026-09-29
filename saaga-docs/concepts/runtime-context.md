@@ -1,6 +1,7 @@
 ---
 title: Runtime Context
 type: concept
+last_verified: 2026-09-29
 sources:
   - packages/core/src/http/save.ts
   - packages/core/src/index.ts
@@ -10,7 +11,6 @@ sources:
   - packages/core/src/fs/*.ts
   - packages/cli/src/context.ts
   - packages/cli/src/deps.ts
-last_verified: 2026-09-19
 ---
 
 # Runtime Context
@@ -31,7 +31,7 @@ The runtime context is the per-command view of configuration and host capabiliti
 
 Effective precedence is defaults, global file, workspace file, environment, then flags. Layers merge by dotted leaf path, so a later partial object does not erase unrelated earlier fields. `LoadedConfig.sources` records the winning source for every effective leaf.
 
-Workspace configuration is treated as untrusted repository input. Its allow-list permits team-facing Jira fields, templates, output, attachment, HTTP, and selected embedding settings, but not service URLs, credential-file paths, authentication modes, warning suppression, or shared export/index roots. Workspace template files must remain inside the workspace config directory after symlink resolution, use a Markdown extension, avoid `.git`, and not resolve to a credential file.
+Workspace configuration is treated as untrusted repository input. Its allow-list permits team-facing Jira fields, templates, output, attachment, HTTP, and selected embedding settings, but excludes service URLs, inline `jira.token`, `confluence.token`, and `embeddings.apiKey`, credential-file paths, authentication modes, warning suppression, and shared export/index roots. The inline values could override a user's token file and select a different identity for requests. Workspace template files must remain inside the workspace config directory after symlink resolution, use a Markdown extension, avoid `.git`, and not resolve to a credential file.
 
 Shared `storage.exportDir` and `storage.indexDir` paths resolve relative to the global config file or home directory, never the current workspace. The local `workspaceStateDir` is always `<cwd>/.lassi`.
 
@@ -62,7 +62,7 @@ Shared `storage.exportDir` and `storage.indexDir` paths resolve relative to the 
 | `CliDeps` | `cwd`, `homedir`, `platform`, `env` | Supplies the host environment without direct global reads. |
 | `CliDeps` | `now`, `random`, `sleep`, `azureToken` | Makes time, retry behavior, and dynamic credentials replaceable. |
 
-Credentials are not eagerly read. Product tokens prefer a non-empty environment value over `tokenFile`; embedding credentials use the same environment-then-file rule unless `azure-ad` requests a fresh token provider. Secret files are BOM-stripped and trimmed, and missing, unreadable, or empty values become `auth` errors.
+Credentials are not eagerly read. Product tokens prefer a non-empty environment value over `tokenFile`; embedding credentials use the same environment-then-file rule unless `azure-ad` requests a fresh token provider. Environment and file values are BOM-stripped and trimmed before use. Missing, unreadable, or empty values, and normalized values containing a control character, become `auth` errors. This includes an embedded line break in either an environment value or a file value.
 
 The schema enforces these cross-field constraints after layering:
 

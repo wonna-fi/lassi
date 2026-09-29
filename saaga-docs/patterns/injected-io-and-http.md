@@ -1,6 +1,7 @@
 ---
 title: Injected I/O and HTTP
 type: pattern
+last_verified: 2026-09-29
 sources:
   - packages/core/src/index.ts
   - packages/core/package.json
@@ -10,7 +11,6 @@ sources:
   - packages/core/src/testing/*.ts
   - packages/cli/src/context.ts
   - packages/cli/src/deps.ts
-last_verified: 2026-09-19
 ---
 
 # Injected I/O and HTTP
@@ -70,7 +70,11 @@ For ordinary library persistence, accept `LassiFs` and use its text/byte operati
 
 Build an `HttpClient` with a static token or a token provider. A provider runs before every attempt, allowing short-lived credentials to refresh. The client refuses absolute URLs on another origin and follows only same-origin read redirects, preventing credentials from crossing a host boundary.
 
+Keep dynamic identifiers in relative service paths and pass them through the client. It rejects `.` and `..` path segments before URL parsing can normalize them into a different resource; encoded dots, backslash separators, and parser-stripped whitespace do not bypass the check. An invalid path is a `usage` failure before a request is sent.
+
 The client applies a deadline to headers and normal response bodies. A download's deadline ends once headers arrive; its body continues under the caller's cancellation signal so a valid large transfer is not mistaken for a stalled request. Some requests take the server minutes to answer. Such a request can raise its own deadline with `minTimeoutMs`, and a longer configured timeout still wins.
+
+JSON methods accept an empty successful body, including HTTP 204. A nonempty 2xx body must parse as JSON even when its content type says otherwise. If it does not, the client raises an `http` failure with the status and a hint to check for an SSO login or proxy page; see [Error Contract](../concepts/error-contract.md).
 
 Retries are a policy decision at the HTTP boundary. GET, HEAD, PUT, and DELETE can retry; POST retries only when the caller explicitly marks the endpoint idempotent. Retryable outcomes are network failures and statuses 429, 502, 503, and 504. Delay uses bounded full-jitter exponential backoff or a capped `Retry-After` value. Caller cancellation stops retrying and interrupts backoff. `retryOnTimeout: false` makes a request's own deadline final, because another attempt would only repeat the same slow work; network errors and retryable statuses still retry.
 
@@ -88,6 +92,8 @@ For tests, use `memFs()` and `fakeFetch()` from `@wonna/lassi-core/testing`. Que
 - Use `saveStream()` for downloads that must enforce limits or avoid partial and overwritten files.
 - Inject a token provider when credentials expire; keep static tokens as plain strings when they do not.
 - Pass relative service paths so the client owns base-path joining and origin enforcement.
+- Reject dot path segments before building a URL; a URL parser would otherwise change the addressed resource.
+- Treat a nonempty, non-JSON 2xx API body as a failure, regardless of its content type.
 - Inject `now()` alongside retry policy whenever HTTP-date `Retry-After` behavior must be deterministic.
 - Give a read the server is known to answer slowly `minTimeoutMs` and `retryOnTimeout: false` instead of raising the timeout for every request.
 - Feed every discovered credential into the shared redactor before any value can reach output.
@@ -115,6 +121,7 @@ For tests, use `memFs()` and `fakeFetch()` from `@wonna/lassi-core/testing`. Que
 - Trust `Content-Length` as the enforcement mechanism for a download limit.
 - Write a download directly onto its destination or silently replace an existing different file.
 - Follow a write redirect or a redirect to another origin with credentials attached.
+- Interpret an HTML login page returned with 2xx as an empty API success.
 - Buffer an attachment only to save it when a web stream can flow directly to `saveStream()`.
 - Construct production adapters inside reusable modules instead of receiving them from the host.
 - Swallow a save conflict or delete the destination to make a retry appear successful.
