@@ -12,12 +12,17 @@ import {
   checkRequiredFields,
   coerceFieldValue,
   expansionFromSections,
+  fieldChangeToApi,
   fieldIdFor,
-  frontmatterDiff,
+  frontmatterChanges,
+  isLiteralFieldValue,
+  needsFieldMeta,
   parseFieldArg,
+  standardSchema,
   stripGeneratedSections,
   type IssueCache,
-  type JiraFieldMetaMap,
+  type JiraFieldMeta,
+  type JiraIssue,
 } from '@wonna/lassi-jira';
 import type { CliDeps } from '../../deps.js';
 import { guardWrite } from '../../guard-write.js';
@@ -32,6 +37,7 @@ import {
   splitEditable,
 } from '../../workfile/index.js';
 import { markdownBodyToWiki } from './body.js';
+import { EDITMETA_PROBE_FIELDS, loadEditmeta } from './editmeta.js';
 import { resolveIssueKey } from './issue-key.js';
 import { aliasesOf, jiraClient } from './shared.js';
 import { templateDescription, templateNamed } from './templates.js';
@@ -56,6 +62,20 @@ interface UpdateOptions {
 }
 
 const collect = (value: string, previous: string[]): string[] => [...previous, value];
+
+/** One field `update` will send, converted only once it is known whether edit metadata is needed. */
+interface PendingField {
+  /** As the user wrote it: the frontmatter key or the `--field` name. */
+  name: string;
+  id: string;
+  /** Whether converting it consults the field's allowed values or needs a schema it lacks. */
+  needsMeta: boolean;
+  convert(meta: JiraFieldMeta | undefined): unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 /** Facts the thrower could not know (project, key, operation) so the hint catalogue can pick a row. */
 function withContext<T>(context: HintContext, run: () => T): T {
@@ -248,11 +268,10 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
       const context: HintContext = { product: 'jira', issueKey: key, operation: 'update' };
       const client = await jiraClient(ctx);
       const aliases = aliasesOf(ctx);
-      const editmeta: JiraFieldMetaMap = await client.editmeta(key);
-      let fields: Record<string, unknown> = {};
-      const changed: string[] = [];
+      const pending: PendingField[] = [];
       let descriptionMarkdown: string | undefined;
       let cache: IssueCache | undefined;
+      let probe: JiraIssue | undefined;
 
       if (opts.file) {
         const workingFile = opts.file;
@@ -296,7 +315,11 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
         }
         cache = { ...stored, ...state };
         if (opts.ifUnchanged) {
-          const live = await client.getIssue(key, { fields: ['updated'] });
+          // The same request names the edit-metadata cache, should a changed field need it.
+          const live = await client.getIssue(key, {
+            fields: ['updated', ...EDITMETA_PROBE_FIELDS],
+          });
+          probe = live;
           if ((live.fields.updated ?? '') !== cache.updated) {
             throw new LassiError(
               'conflict',
@@ -318,20 +341,28 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
         }
         const cached = cache;
         const diff = withContext(fileContext, () =>
-          frontmatterDiff(
+          frontmatterChanges(
             cached,
             {
               editable: split.editable,
               ...(split.readonly ? { readonly: split.readonly } : {}),
               body: description,
             },
-            aliases,
-            editmeta
+            aliases
           )
         );
         for (const warning of diff.warnings) ctx.logger.warn(warning);
-        fields = { ...diff.fields };
-        changed.push(...diff.changedKeys);
+        for (const change of diff.changes) {
+          pending.push({
+            name: change.key,
+            id: change.id,
+            // null clears and a mapping is sent verbatim; neither is checked against anything.
+            needsMeta:
+              change.value !== null && !isRecord(change.value) && needsFieldMeta(change.schema),
+            convert: (meta) =>
+              withContext(fileContext, () => fieldChangeToApi(change, cached.key, meta)),
+          });
+        }
         if (diff.descriptionChanged) descriptionMarkdown = description;
       }
 
@@ -342,8 +373,38 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
         if (id === 'description') {
           throw new LassiError('usage', 'use --body (markdown) to change the description');
         }
-        fields[id] = withContext(context, () => coerceFieldValue(raw, editmeta[id], id));
-        changed.push(name);
+        const schema = standardSchema(id);
+        pending.push({
+          name,
+          id,
+          needsMeta: !isLiteralFieldValue(raw) && needsFieldMeta(schema),
+          convert: (meta) =>
+            withContext(context, () => coerceFieldValue(raw, meta, id, meta?.schema ?? schema)),
+        });
+      }
+
+      // Edit metadata can take Jira minutes to compute, so it is loaded only when a changed field
+      // is checked against its allowed values, and then from the cache when it can be.
+      const needed = pending.filter((p) => p.needsMeta);
+      const editmeta =
+        needed.length === 0
+          ? undefined
+          : await loadEditmeta(ctx, client, key, {
+              fieldNames: [...new Set(needed.map((p) => p.name))],
+              ...(probe ? { probe } : {}),
+            });
+      const fields: Record<string, unknown> = {};
+      const changed: string[] = [];
+      for (const field of pending) {
+        try {
+          fields[field.id] = field.convert(editmeta?.fields[field.id]);
+        } catch (err) {
+          if (editmeta?.cached && isLassiError(err) && err.code === 'validation') {
+            err.context = { ...err.context, allowedValuesCachedAt: editmeta.fetchedAt };
+          }
+          throw err;
+        }
+        changed.push(field.name);
       }
       if (descriptionMarkdown !== undefined) {
         fields['description'] = await markdownBodyToWiki(ctx, client, descriptionMarkdown);

@@ -8,6 +8,7 @@ const ISSUE = {
   fields: {
     summary: 'Login page throws 500 on empty password',
     description: 'h2. Steps\n# one',
+    project: { id: '10000', key: 'PROJ' },
     issuetype: { id: '1', name: 'Bug' },
     priority: { id: '2', name: 'High' },
     status: { name: 'In Progress' },
@@ -710,6 +711,162 @@ describe('lassi jira issue update: one cache entry per working file', () => {
       message: expect.stringContaining('no record of work/copy.md'),
     });
     expect(writes(t)).toHaveLength(0);
+  });
+});
+
+const EDITMETA_CACHE = '/home/u/proj/.lassi/cache/jira/editmeta/PROJ.1.json';
+
+function cachedEditmeta(fetchedAt: string, extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    schema: 1,
+    baseUrl: 'https://jira.example.internal',
+    project: 'PROJ',
+    issueTypeId: '1',
+    fetchedAt,
+    fields: {
+      customfield_10001: {
+        fieldId: 'customfield_10001',
+        name: 'Team',
+        required: false,
+        schema: { type: 'option' },
+        allowedValues: [{ value: 'Platform' }, { value: 'Web' }],
+      },
+    },
+    ...extra,
+  });
+}
+
+const editmetaCalls = (t: ReturnType<typeof program>) =>
+  t.fetch.calls.filter((c) => c.url.pathname.endsWith('/editmeta'));
+
+describe('lassi jira issue update: edit metadata only when a change needs it', () => {
+  it('does not fetch it for the description, plain fields or clearing a field', async () => {
+    const t = program();
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--body', 'x'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'summary=New'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=-'])).toBe(0);
+    expect(JSON.parse(writes(t)[2]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10001: null },
+    });
+    expect(editmetaCalls(t)).toHaveLength(0);
+    expect(t.stderr()).toBe('');
+  });
+
+  it('does not fetch it for an unchanged file or a labels-only change', async () => {
+    const t = program();
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--file', 'work/PROJ-123.md'])).toBe(
+      0
+    );
+    const path = '/home/u/proj/work/PROJ-123.md';
+    await t.fs.writeFile(
+      path,
+      (await t.fs.readFile(path)).replace('  - auth\n', '  - auth\n  - urgent\n')
+    );
+    expect(
+      await t.run(['jira', 'issue', 'update', 'PROJ-123', '--file', 'work/PROJ-123.md', '--keep'])
+    ).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { labels: ['auth', 'urgent'] },
+    });
+    expect(editmetaCalls(t)).toHaveLength(0);
+  });
+
+  it('fetches it once for an option field, says so, and serves the next update from the cache', async () => {
+    const t = program();
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+    expect(t.stderr()).toBe(
+      'warn: fetching edit metadata for PROJ-123 to check team; Jira can take minutes to answer this on a large project\n'
+    );
+    const probe = t.fetch.calls.find((c) => c.url.pathname === '/rest/api/2/issue/PROJ-123');
+    expect(probe?.url.search).toBe('?fields=project%2Cissuetype');
+    expect(JSON.parse(await t.fs.readFile(EDITMETA_CACHE))).toMatchObject({
+      schema: 1,
+      baseUrl: 'https://jira.example.internal',
+      project: 'PROJ',
+      issueTypeId: '1',
+      fetchedAt: '2026-09-04T10:00:00.000Z',
+      fields: { customfield_10001: { allowedValues: [{ value: 'Platform' }, { value: 'Web' }] } },
+    });
+
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=platform'])).toBe(
+      0
+    );
+    expect(editmetaCalls(t)).toHaveLength(1);
+    expect(JSON.parse(writes(t)[1]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10001: { value: 'Platform' } },
+    });
+  });
+
+  it('fetches it again when the cache is stale or from another server', async () => {
+    for (const cache of [
+      cachedEditmeta('2026-09-03T09:59:59.000Z'),
+      cachedEditmeta('2026-09-04T09:00:00.000Z', { baseUrl: 'https://other.example.internal' }),
+    ]) {
+      const t = program({ files: { [EDITMETA_CACHE]: cache } });
+      expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+      expect(editmetaCalls(t)).toHaveLength(1);
+    }
+  });
+
+  it('rejects a value outside the cached allowed values without fetching, and says how to refresh', async () => {
+    const t = program({ files: { [EDITMETA_CACHE]: cachedEditmeta('2026-09-04T09:00:00.000Z') } });
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=Mobile'])).toBe(5);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'validation',
+      hint: expect.stringContaining(
+        'The allowed values were cached at 2026-09-04T09:00:00.000Z; run `lassi jira issue editmeta PROJ-123` to refresh them'
+      ),
+    });
+    expect(editmetaCalls(t)).toHaveLength(0);
+    expect(writes(t)).toHaveLength(0);
+  });
+
+  it('does not cache an empty answer, which a non-editable status gives', async () => {
+    const t = program({
+      routes: [{ path: '/rest/api/2/issue/PROJ-123/editmeta', json: { fields: {} } }],
+    });
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+    expect(await t.fs.exists(EDITMETA_CACHE)).toBe(false);
+  });
+
+  it('reuses the --if-unchanged request to find the cache', async () => {
+    const t = program();
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    const path = '/home/u/proj/work/PROJ-123.md';
+    await t.fs.writeFile(path, (await t.fs.readFile(path)).replace('team: Platform', 'team: Web'));
+    const before = t.fetch.calls.length;
+    expect(
+      await t.run([
+        'jira',
+        'issue',
+        'update',
+        'PROJ-123',
+        '--file',
+        'work/PROJ-123.md',
+        '--if-unchanged',
+        '--keep',
+      ])
+    ).toBe(0);
+    expect(t.fetch.calls.slice(before).map((c) => `${c.method} ${c.url.pathname}`)).toEqual([
+      'GET /rest/api/2/issue/PROJ-123',
+      'GET /rest/api/2/issue/PROJ-123/editmeta',
+      'PUT /rest/api/2/issue/PROJ-123',
+    ]);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10001: { value: 'Web' } },
+    });
+  });
+
+  it('issue editmeta shows the live answer and caches it for the next update', async () => {
+    const t = program();
+    expect(await t.run(['jira', 'issue', 'editmeta', 'PROJ-123'])).toBe(0);
+    expect(t.stderr()).toBe(
+      'warn: fetching edit metadata for PROJ-123; Jira can take minutes to answer this on a large project\n'
+    );
+    expect(await t.fs.exists(EDITMETA_CACHE)).toBe(true);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+    expect(editmetaCalls(t)).toHaveLength(1);
   });
 });
 

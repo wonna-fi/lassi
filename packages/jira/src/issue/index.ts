@@ -12,7 +12,15 @@ export {
   type IssueCache,
   type IssueFileState,
 } from './cache.js';
-export { frontmatterDiff, type DiffInput, type DiffResult } from './diff.js';
+export {
+  fieldChangeToApi,
+  frontmatterChanges,
+  frontmatterDiff,
+  type DiffInput,
+  type DiffResult,
+  type FieldChange,
+  type FrontmatterChanges,
+} from './diff.js';
 export {
   composeBody,
   expansionFromSections,

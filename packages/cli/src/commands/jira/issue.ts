@@ -14,6 +14,7 @@ import {
   jiraClient,
   renderFieldMetaTable,
 } from './shared.js';
+import { fetchEditmeta } from './editmeta.js';
 import { registerIssueExport } from './export.js';
 import { resolveIssueKey } from './issue-key.js';
 import { registerIssueWrites } from './issue-write.js';
@@ -303,7 +304,7 @@ export function registerIssue(jira: Command, deps: CliDeps, session: Session): v
     async run(ctx, [keyArg]) {
       const key = await resolveIssueKey(ctx, keyArg);
       const client = await jiraClient(ctx);
-      const fields = await client.editmeta(key);
+      const fields = await fetchEditmeta(ctx, client, key);
       return {
         markdown: `# ${key} editmeta\n\n${renderFieldMetaTable(fields, aliasesOf(ctx))}`,
         data: { key, fields },

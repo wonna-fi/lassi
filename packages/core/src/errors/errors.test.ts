@@ -213,6 +213,26 @@ describe('pickHint', () => {
     );
   });
 
+  it('a value checked against cached allowed values → refresh them with editmeta', () => {
+    const err = new LassiError(
+      'validation',
+      '"Mobile" is not an allowed value for customfield_10001',
+      {
+        errors: { customfield_10001: 'Allowed: Platform, Web' },
+        context: {
+          product: 'jira',
+          issueKey: 'PROJ-1',
+          operation: 'update',
+          allowedValues: { customfield_10001: ['Platform', 'Web'] },
+          allowedValuesCachedAt: '2026-09-29T08:00:00.000Z',
+        },
+      }
+    );
+    expect(pickHint(err)).toBe(
+      'The allowed values were cached at 2026-09-29T08:00:00.000Z; run `lassi jira issue editmeta PROJ-1` to refresh them. Allowed values — customfield_10001: Platform, Web.'
+    );
+  });
+
   it('unknown field on update → editmeta', () => {
     const err = new LassiError('validation', 'x', {
       http: 400,

@@ -228,6 +228,58 @@ describe('createHttpClient', () => {
     });
   });
 
+  it('lets a known-slow read raise its deadline, but never shorten it', async () => {
+    const slow: typeof globalThis.fetch = (_url, init) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(Response.json({ ok: true })), 20);
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            reject(init.signal?.reason);
+          },
+          { once: true }
+        );
+      });
+    const { c } = client(slow, { timeoutMs: 5, retry: { maxAttempts: 1 } });
+    await expect(c.get('/x')).rejects.toMatchObject({ code: 'timeout' });
+    expect(await c.get('/x', { minTimeoutMs: 1_000 })).toEqual({ ok: true });
+
+    const stalled: typeof globalThis.fetch = async () => {
+      throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+    };
+    const longer = client(stalled, { timeoutMs: 500, retry: { maxAttempts: 1 } });
+    await expect(longer.c.get('/x', { minTimeoutMs: 50 })).rejects.toMatchObject({
+      message: 'request timed out after 500 ms',
+    });
+  });
+
+  it('makes a timeout final with retryOnTimeout: false, and still retries other failures', async () => {
+    let calls = 0;
+    const stalled: typeof globalThis.fetch = async () => {
+      calls += 1;
+      throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+    };
+    const { c, sleeps } = client(stalled, { timeoutMs: 5 });
+    await expect(c.get('/x', { minTimeoutMs: 50, retryOnTimeout: false })).rejects.toMatchObject({
+      code: 'timeout',
+      message: 'request timed out after 50 ms',
+    });
+    expect(calls).toBe(1);
+    expect(sleeps).toEqual([]);
+
+    calls = 0;
+    const reset: typeof globalThis.fetch = async () => {
+      calls += 1;
+      throw new TypeError('fetch failed');
+    };
+    const other = client(reset);
+    await expect(other.c.get('/x', { retryOnTimeout: false })).rejects.toMatchObject({
+      code: 'network',
+    });
+    expect(calls).toBe(3);
+  });
+
   it('refuses to send the token to another origin, without calling fetch', async () => {
     const fetch = fakeFetch([]);
     const { c } = client(fetch);

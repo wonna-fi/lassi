@@ -87,6 +87,10 @@ const RULES: Rule[] = [
       return `Run \`lassi jira issue createmeta ${project}${type}\` to see required fields and allowed values.${allowedValuesNote(e)}`;
     }
     if (issueKey) {
+      const cachedAt = e.context.allowedValuesCachedAt;
+      if (cachedAt !== undefined) {
+        return `The allowed values were cached at ${cachedAt}; run \`lassi jira issue editmeta ${issueKey}\` to refresh them${aliasNote(e)}.${allowedValuesNote(e)}`;
+      }
       return `Run \`lassi jira issue editmeta ${issueKey}\` to see editable fields and allowed values${aliasNote(e)}.${allowedValuesNote(e)}`;
     }
     return undefined;

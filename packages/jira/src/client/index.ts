@@ -165,10 +165,11 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
     myself: () => http.get<JiraUser>('/rest/api/2/myself'),
 
     async getIssue(key, o = {}) {
+      const expand = o.expand ?? ['names', 'schema'];
       return http.get<JiraIssue>(issuePath(key), {
         query: {
           fields: (o.fields ?? ['*all']).join(','),
-          expand: (o.expand ?? ['names', 'schema']).join(','),
+          expand: expand.length > 0 ? expand.join(',') : undefined,
         },
         context: { product: 'jira', issueKey: key },
       });
