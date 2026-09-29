@@ -5,7 +5,13 @@ export {
   resolveFieldAliases,
   STANDARD_FIELD_NAMES,
 } from './aliases.js';
-export { coerceFieldValue, parseFieldArg, splitList } from './coerce.js';
+export { coerceFieldValue, isLiteralFieldValue, parseFieldArg, splitList } from './coerce.js';
+export {
+  EDITMETA_CACHE_TTL_MS,
+  usableEditmetaCache,
+  type EditmetaCache,
+  type EditmetaCacheKey,
+} from './editmeta-cache.js';
 export {
   buildCreateIssueFields,
   checkRequiredFields,
@@ -16,5 +22,7 @@ export {
   AllowedValueMismatch,
   allowedValueLabels,
   apiValueToScalar,
+  needsFieldMeta,
   scalarToApiValue,
+  standardSchema,
 } from './normalize.js';

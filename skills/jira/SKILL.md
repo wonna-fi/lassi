@@ -17,7 +17,8 @@ misconfigured.
    outside a ```` ```jira ```` fence; the CLI rejects it with exit 2.
 2. **Look before you write.** Before `issue create`, run `lassi jira templates` (use
    `--template <name>` when one fits), `lassi jira fields` and `lassi jira issue createmeta <PROJECT>
-   --type <TYPE>`; before `issue update`, run `lassi jira issue editmeta <KEY>`.
+   --type <TYPE>`. Before `issue update`, `lassi jira fields` is enough: update checks allowed values
+   itself. Run `lassi jira issue editmeta <KEY>` only to see them; Jira can take minutes to answer.
 3. **On a non-zero exit**, read the JSON on stderr, follow `hint`, retry **once**, then stop and ask
    the human. Never loop on the same error.
 4. **Attachments are files.** `lassi jira attach get <KEY>` downloads them to disk; read them with your

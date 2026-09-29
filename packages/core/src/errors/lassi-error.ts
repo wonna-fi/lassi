@@ -26,6 +26,8 @@ export interface HintContext {
   versionFrom?: number;
   versionTo?: number;
   allowedValues?: Record<string, string[]>;
+  /** When the allowed values a value was checked against came from a local cache, not the server. */
+  allowedValuesCachedAt?: string;
   transition?: boolean;
   operation?: 'create' | 'update' | 'transition' | 'comment' | 'link' | 'search' | 'other';
 }

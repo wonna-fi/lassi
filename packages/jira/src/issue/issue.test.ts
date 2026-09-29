@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { JiraIssue } from '../client/types.js';
 import { buildIssueCache } from './cache.js';
-import { frontmatterDiff } from './diff.js';
+import { fieldChangeToApi, frontmatterChanges, frontmatterDiff } from './diff.js';
 import {
   composeBody,
   expansionFromSections,
@@ -224,6 +224,59 @@ describe('frontmatterDiff', () => {
       issuetype: { name: 'Task' },
       components: [{ name: 'UI' }, { name: 'API' }],
     });
+  });
+});
+
+describe('frontmatterChanges / fieldChangeToApi', () => {
+  const { frontmatter, fieldSchema } = issueToFrontmatter(ISSUE, ALIASES, {
+    baseUrl: 'https://jira.example.internal',
+    fetchedAt: 't',
+  });
+  const cache = buildIssueCache(ISSUE, frontmatter, '', fieldSchema, ALIASES);
+
+  it('lists changed fields with the schema known without fetching metadata', () => {
+    const { changes } = frontmatterChanges(
+      cache,
+      {
+        editable: { ...cache.editable, team: 'Web', labels: ['x'], customfield_10077: 'y' },
+        body: '',
+      },
+      ALIASES
+    );
+    expect(changes).toEqual([
+      { key: 'labels', id: 'labels', value: ['x'], schema: { type: 'array', items: 'string' } },
+      {
+        key: 'team',
+        id: 'customfield_10001',
+        value: 'Web',
+        schema: { type: 'option', custom: 'select' },
+      },
+      { key: 'customfield_10077', id: 'customfield_10077', value: 'y' },
+    ]);
+  });
+
+  it('converts with the metadata when given, and without it by the recorded schema', () => {
+    const change = {
+      key: 'team',
+      id: 'customfield_10001',
+      value: 'web',
+      schema: { type: 'option' },
+    };
+    expect(fieldChangeToApi(change, 'PROJ-123')).toEqual({ value: 'web' });
+    const meta = {
+      fieldId: 'customfield_10001',
+      name: 'Team',
+      required: false,
+      schema: { type: 'option' },
+      allowedValues: [{ value: 'Web' }],
+    };
+    expect(fieldChangeToApi(change, 'PROJ-123', meta)).toEqual({ value: 'Web' });
+    expect(() => fieldChangeToApi({ ...change, value: 'Mobile' }, 'PROJ-123', meta)).toThrow(
+      expect.objectContaining({
+        code: 'validation',
+        context: expect.objectContaining({ issueKey: 'PROJ-123', operation: 'update' }),
+      })
+    );
   });
 });
 

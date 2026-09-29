@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { JiraFieldMeta, JiraIssueTypeMeta } from '../client/types.js';
 import { aliasFor, fieldIdFor, resolveFieldAliases } from './aliases.js';
-import { coerceFieldValue, parseFieldArg, splitList } from './coerce.js';
+import { coerceFieldValue, isLiteralFieldValue, parseFieldArg, splitList } from './coerce.js';
 import { buildCreateIssueFields, checkRequiredFields } from './create-fields.js';
-import { apiValueToScalar, scalarToApiValue } from './normalize.js';
+import { EDITMETA_CACHE_TTL_MS, usableEditmetaCache } from './editmeta-cache.js';
+import { apiValueToScalar, needsFieldMeta, scalarToApiValue, standardSchema } from './normalize.js';
 
 const ALIASES = { team: 'customfield_10001', points: 'customfield_10002' };
 
@@ -224,5 +225,72 @@ describe('create fields', () => {
       'summary',
       'customfield_10001',
     ]);
+  });
+});
+
+describe('needsFieldMeta / standardSchema', () => {
+  it('asks for metadata only where allowed values are checked or the schema is unknown', () => {
+    expect(needsFieldMeta({ type: 'option' })).toBe(true);
+    expect(needsFieldMeta({ type: 'array', items: 'option' })).toBe(true);
+    expect(needsFieldMeta(standardSchema('priority'))).toBe(true);
+    expect(needsFieldMeta(standardSchema('issuetype'))).toBe(true);
+    expect(needsFieldMeta({ type: 'resolution' })).toBe(true);
+    expect(needsFieldMeta(undefined)).toBe(true);
+    for (const id of ['summary', 'labels', 'assignee', 'duedate', 'components', 'fixVersions']) {
+      expect(needsFieldMeta(standardSchema(id))).toBe(false);
+    }
+    expect(needsFieldMeta({ type: 'number' })).toBe(false);
+    expect(standardSchema('customfield_10001')).toBeUndefined();
+    expect(standardSchema('toString')).toBeUndefined();
+  });
+
+  it('coerces --field values with a fallback schema when no metadata was fetched', () => {
+    expect(coerceFieldValue('High', undefined, 'priority', standardSchema('priority'))).toEqual({
+      name: 'High',
+    });
+    expect(coerceFieldValue('a, b', undefined, 'labels', standardSchema('labels'))).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(isLiteralFieldValue(' - ')).toBe(true);
+    expect(isLiteralFieldValue('')).toBe(true);
+    expect(isLiteralFieldValue('{"value":"A"}')).toBe(true);
+    expect(isLiteralFieldValue('Web')).toBe(false);
+  });
+});
+
+describe('usableEditmetaCache', () => {
+  const now = new Date('2026-09-04T10:00:00.000Z');
+  const want = { baseUrl: 'https://jira.example.internal', project: 'PROJ', issueTypeId: '1', now };
+  const entry = {
+    schema: 1,
+    baseUrl: 'https://jira.example.internal',
+    project: 'PROJ',
+    issueTypeId: '1',
+    fetchedAt: '2026-09-04T09:00:00.000Z',
+    fields: {},
+  };
+
+  it('accepts a fresh entry for the same server, project and issue type', () => {
+    expect(usableEditmetaCache(entry, want)).toBe(entry);
+  });
+
+  it('rejects anything else as a miss', () => {
+    const stale = new Date(Date.parse(entry.fetchedAt) + EDITMETA_CACHE_TTL_MS);
+    for (const stored of [
+      undefined,
+      'text',
+      { ...entry, schema: 2 },
+      { ...entry, baseUrl: 'https://other.example.internal' },
+      { ...entry, project: 'OTHER' },
+      { ...entry, issueTypeId: '2' },
+      { ...entry, fetchedAt: 'yesterday' },
+      { ...entry, fetchedAt: '2026-09-04T11:00:00.000Z' },
+      { ...entry, fields: [] },
+    ]) {
+      expect(usableEditmetaCache(stored, want)).toBeUndefined();
+    }
+    expect(usableEditmetaCache(entry, { ...want, now: stale })).toBeUndefined();
+    expect(usableEditmetaCache(entry, { ...want, ttlMs: 60_000 })).toBeUndefined();
   });
 });

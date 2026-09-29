@@ -1,7 +1,7 @@
 import { LassiError } from '@wonna/lassi-core';
-import type { JiraFieldMetaMap, JiraFieldSchema } from '../client/types.js';
+import type { JiraFieldMeta, JiraFieldMetaMap, JiraFieldSchema } from '../client/types.js';
 import { fieldIdFor } from '../fields/aliases.js';
-import { AllowedValueMismatch, scalarToApiValue } from '../fields/normalize.js';
+import { AllowedValueMismatch, scalarToApiValue, standardSchema } from '../fields/normalize.js';
 import type { IssueCache } from './cache.js';
 
 export interface DiffInput {
@@ -17,20 +17,6 @@ export interface DiffResult {
   descriptionChanged: boolean;
   warnings: string[];
 }
-
-/** Schemas for the standard editable keys when neither editmeta nor the cache knows them. */
-const STANDARD_SCHEMA: Record<string, JiraFieldSchema> = {
-  summary: { type: 'string' },
-  issuetype: { type: 'issuetype' },
-  priority: { type: 'priority' },
-  assignee: { type: 'user' },
-  labels: { type: 'array', items: 'string' },
-  components: { type: 'array', items: 'component' },
-  fixVersions: { type: 'array', items: 'version' },
-  versions: { type: 'array', items: 'version' },
-  duedate: { type: 'date' },
-  reporter: { type: 'user' },
-};
 
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -55,19 +41,34 @@ function sameSet(a: unknown, b: unknown): boolean {
   return b.every((v) => sa.has(JSON.stringify(v)));
 }
 
+/** One edited frontmatter key, before it is converted for the API. */
+export interface FieldChange {
+  /** The frontmatter key as written: an alias, a standard name or a raw id. */
+  key: string;
+  id: string;
+  value: unknown;
+  /** What the fetch recorded or the standard fields define; field metadata, when loaded, wins. */
+  schema?: JiraFieldSchema;
+}
+
+export interface FrontmatterChanges {
+  changes: FieldChange[];
+  descriptionChanged: boolean;
+  warnings: string[];
+}
+
 /**
- * Compares the edited frontmatter with the cache and turns changed keys into an API payload.
- * Deleted keys are ignored with a warning (an accidental deletion must not wipe a field: set the
- * key to `null` to clear it). `readonly` edits are warned about and ignored.
+ * Compares the edited frontmatter with the cache, without converting anything, so the caller can
+ * tell from the changed fields whether their live metadata is needed at all. Deleted keys are
+ * ignored with a warning (an accidental deletion must not wipe a field: set the key to `null` to
+ * clear it). `readonly` edits are warned about and ignored.
  */
-export function frontmatterDiff(
+export function frontmatterChanges(
   cache: IssueCache,
   current: DiffInput,
-  aliases: Record<string, string>,
-  editmeta?: JiraFieldMetaMap
-): DiffResult {
-  const fields: Record<string, unknown> = {};
-  const changedKeys: string[] = [];
+  aliases: Record<string, string>
+): FrontmatterChanges {
+  const changes: FieldChange[] = [];
   const warnings: string[] = [];
   const merged = { ...cache.aliases, ...aliases };
 
@@ -92,25 +93,8 @@ export function frontmatterDiff(
         }
       );
     }
-    const meta = editmeta?.[id];
-    const schema = meta?.schema ?? cache.fieldSchema[id] ?? STANDARD_SCHEMA[id];
-    try {
-      fields[id] = scalarToApiValue(value, schema, meta);
-    } catch (err) {
-      if (err instanceof AllowedValueMismatch) {
-        throw new LassiError('validation', err.message, {
-          errors: { [err.fieldId]: `Allowed: ${err.allowed.join(', ')}` },
-          context: {
-            product: 'jira',
-            issueKey: cache.key,
-            operation: 'update',
-            allowedValues: { [err.fieldId]: err.allowed },
-          },
-        });
-      }
-      throw err;
-    }
-    changedKeys.push(key);
+    const schema = cache.fieldSchema[id] ?? standardSchema(id);
+    changes.push({ key, id, value, ...(schema ? { schema } : {}) });
   }
 
   for (const key of Object.keys(cache.editable)) {
@@ -130,5 +114,44 @@ export function frontmatterDiff(
 
   const descriptionChanged =
     current.body.replace(/\s+$/, '') !== cache.descriptionMarkdown.replace(/\s+$/, '');
-  return { fields, changedKeys, descriptionChanged, warnings };
+  return { changes, descriptionChanged, warnings };
+}
+
+/** One change as its API value; a value outside the field's allowed values is a validation error. */
+export function fieldChangeToApi(
+  change: FieldChange,
+  issueKey: string,
+  meta?: JiraFieldMeta
+): unknown {
+  try {
+    return scalarToApiValue(change.value, meta?.schema ?? change.schema, meta);
+  } catch (err) {
+    if (err instanceof AllowedValueMismatch) {
+      throw new LassiError('validation', err.message, {
+        errors: { [err.fieldId]: `Allowed: ${err.allowed.join(', ')}` },
+        context: {
+          product: 'jira',
+          issueKey,
+          operation: 'update',
+          allowedValues: { [err.fieldId]: err.allowed },
+        },
+      });
+    }
+    throw err;
+  }
+}
+
+/** `frontmatterChanges` and `fieldChangeToApi` in one step, for a caller that already has the metadata. */
+export function frontmatterDiff(
+  cache: IssueCache,
+  current: DiffInput,
+  aliases: Record<string, string>,
+  editmeta?: JiraFieldMetaMap
+): DiffResult {
+  const { changes, descriptionChanged, warnings } = frontmatterChanges(cache, current, aliases);
+  const fields: Record<string, unknown> = {};
+  for (const change of changes) {
+    fields[change.id] = fieldChangeToApi(change, cache.key, editmeta?.[change.id]);
+  }
+  return { fields, changedKeys: changes.map((c) => c.key), descriptionChanged, warnings };
 }

@@ -3,6 +3,9 @@ import { isIssueKey } from '@wonna/lassi-jira';
 
 /** Confluence content ids are decimal, everywhere in the DC REST API. */
 const CONTENT_ID = /^\d+$/;
+/** The project part of an issue key. */
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]+$/;
+const ISSUE_TYPE_ID = /^\d+$/;
 
 function reject(product: string, what: string, value: string): LassiError {
   return new LassiError('internal', `${product} returned ${what}: ${JSON.stringify(value)}`, {
@@ -24,5 +27,16 @@ export function serverIssueKey(key: string): string {
 /** The same rule for Confluence content ids, which name the export file and the storage cache. */
 export function serverContentId(id: string): string {
   if (!CONTENT_ID.test(id)) throw reject('Confluence', 'a content id that is not one', id);
+  return id;
+}
+
+/** A project key and issue type id from an issue, which together name its edit-metadata cache. */
+export function serverProjectKey(key: string): string {
+  if (!PROJECT_KEY.test(key)) throw reject('Jira', 'a project key that is not one', key);
+  return key;
+}
+
+export function serverIssueTypeId(id: string): string {
+  if (!ISSUE_TYPE_ID.test(id)) throw reject('Jira', 'an issue type id that is not one', id);
   return id;
 }

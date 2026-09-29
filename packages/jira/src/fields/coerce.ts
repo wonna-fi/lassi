@@ -1,5 +1,5 @@
 import { LassiError } from '@wonna/lassi-core';
-import type { JiraFieldMeta } from '../client/types.js';
+import type { JiraFieldMeta, JiraFieldSchema } from '../client/types.js';
 import { AllowedValueMismatch, scalarToApiValue } from './normalize.js';
 
 /** `alias=value` → parts; the value may contain `=`. */
@@ -30,14 +30,22 @@ export function splitList(raw: string): string[] {
   return out.filter((s) => s.length > 0);
 }
 
+/** Whether `coerceFieldValue` sends this value as it stands: a clear (empty or `-`) or JSON. */
+export function isLiteralFieldValue(raw: string): boolean {
+  const trimmed = raw.trim();
+  return trimmed === '' || trimmed === '-' || trimmed.startsWith('{') || trimmed.startsWith('[');
+}
+
 /**
  * Coerces a `--field` value with the field's live schema (createmeta / editmeta / transition
- * screen). A JSON-looking value is sent verbatim; empty or `-` clears the field.
+ * screen), or with `schema` when no metadata was fetched. A JSON-looking value is sent verbatim;
+ * empty or `-` clears the field.
  */
 export function coerceFieldValue(
   raw: string,
   meta: JiraFieldMeta | undefined,
-  fieldId: string
+  fieldId: string,
+  schema: JiraFieldSchema | undefined = meta?.schema
 ): unknown {
   const trimmed = raw.trim();
   if (trimmed === '' || trimmed === '-') return null;
@@ -51,7 +59,6 @@ export function coerceFieldValue(
       );
     }
   }
-  const schema = meta?.schema;
   try {
     if (schema?.type === 'number') {
       const n = Number(trimmed);

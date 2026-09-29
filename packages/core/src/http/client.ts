@@ -47,6 +47,16 @@ export interface RequestOptions {
   context?: HintContext;
   /** Lets a POST retry on 429/5xx/network like a GET; only for endpoints that are safe to repeat. */
   idempotent?: boolean;
+  /**
+   * A floor for this request's deadline, for a read the server is known to answer slowly. A longer
+   * configured timeout still wins.
+   */
+  minTimeoutMs?: number;
+  /**
+   * `false` makes a deadline timeout final. Repeating a request the server could not finish in time
+   * only makes it compute the same answer again; other network errors and 429/5xx still retry.
+   */
+  retryOnTimeout?: boolean;
 }
 
 export interface DownloadResult {
@@ -303,6 +313,7 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
     // A non-retryable request (POST, uploads) gets exactly one attempt; the trace says so.
     const retryable = attempt.retryable && canRetry(attempt.method, attempt.options.idempotent);
     const maxAttempts = retryable ? policy.maxAttempts : 1;
+    const requestTimeoutMs = Math.max(timeoutMs, attempt.options.minTimeoutMs ?? 0);
     let url = attempt.url;
     let redirects = 0;
     for (let n = 1; ; n++) {
@@ -313,7 +324,7 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
       logger.debug(`-> ${attempt.method} ${displayPath} (attempt ${n}/${maxAttempts})`);
       // A download's body streams under the caller's signal once the headers are in; keeping the
       // deadline attached would abort every transfer that takes longer than one request may.
-      const deadline = createDeadline(timeoutMs, attempt.options.signal);
+      const deadline = createDeadline(requestTimeoutMs, attempt.options.signal);
       let response: Response;
       let text: string | undefined;
       try {
@@ -339,8 +350,9 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
         // A cancellation is not a failure worth retrying: the signal is already aborted, so every
         // remaining attempt fails the moment it starts and only the backoff sleeps take any time —
         // and each one re-invokes the token provider on the way.
+        const final = timedOut && attempt.options.retryOnTimeout === false;
         const decision =
-          retryable && !cancelled
+          retryable && !cancelled && !final
             ? decideRetry(
                 {
                   method: attempt.method,
@@ -351,7 +363,11 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
                 policy,
                 random
               )
-            : { retry: false, delayMs: 0, reason: 'not retryable' };
+            : {
+                retry: false,
+                delayMs: 0,
+                reason: final ? 'timeouts are final for this request' : 'not retryable',
+              };
         logger.debug(
           `<- ${timedOut ? 'timeout' : cancelled ? 'cancelled' : 'network error'} ${attempt.method} ${displayPath} ${elapsed}ms${decision.retry ? `; retrying in ${decision.delayMs}ms` : ''}`
         );
@@ -361,7 +377,7 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
           // token-provider call and a request on a signal that is already dead.
           if (attempt.options.signal?.aborted === true) {
             const error = fromNetworkError(err, request, {
-              timeoutMs,
+              timeoutMs: requestTimeoutMs,
               product: opts.product,
               cancelled: true,
             });
@@ -371,7 +387,7 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
           continue;
         }
         const error = fromNetworkError(err, request, {
-          timeoutMs,
+          timeoutMs: requestTimeoutMs,
           product: opts.product,
           ...(cancelled ? { cancelled } : {}),
         });
