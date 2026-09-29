@@ -47,6 +47,11 @@ const RULES: Rule[] = [
     e.code === 'tls'
       ? 'The server certificate is not trusted by Node; set NODE_EXTRA_CA_CERTS=/path/to/custom-ca.pem (or NODE_USE_SYSTEM_CA=1) and run `lassi doctor`.'
       : undefined,
+  (e) => {
+    // Jira computing allowed values for a large edit screen, not the network.
+    if (e.code !== 'timeout' || !/\/editmeta(\?|$)/.test(e.request?.url ?? '')) return undefined;
+    return 'Jira did not finish computing the edit metadata in time; retry when it is less busy, or change only fields that need no allowed values (summary, labels, assignee, description).';
+  },
   (e) =>
     e.code === 'timeout'
       ? 'The request timed out; check VPN and proxy settings (NODE_USE_ENV_PROXY=1 when a proxy is required) and run `lassi doctor`.'
