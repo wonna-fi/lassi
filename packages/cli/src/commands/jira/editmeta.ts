@@ -43,6 +43,19 @@ function cacheKey(
   };
 }
 
+/** The cache only saves time: an entry that cannot be read is a miss, like a damaged one. */
+async function readCache(ctx: Context, path: string): Promise<unknown> {
+  try {
+    return await readJsonCache(path, ctx.deps.fs);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    ctx.logger.warn(
+      `could not read cached edit metadata ${displayPath(ctx.deps.cwd, path)}: ${reason}`
+    );
+    return undefined;
+  }
+}
+
 /**
  * Remembers edit metadata for the issue's project and type. An empty answer is not stored: Jira
  * gives one for an issue in a status that forbids editing, and every other issue of that type would
@@ -91,7 +104,7 @@ export async function loadEditmeta(
     opts.probe ?? (await client.getIssue(issueKey, { fields: EDITMETA_PROBE_FIELDS, expand: [] }));
   const key = cacheKey(ctx, client, probe);
   if (key) {
-    const hit = usableEditmetaCache(await readJsonCache(key.path, ctx.deps.fs), {
+    const hit = usableEditmetaCache(await readCache(ctx, key.path), {
       ...key,
       now: ctx.deps.now(),
     });

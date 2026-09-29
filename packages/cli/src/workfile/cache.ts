@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { pathApi, type LassiFs } from '@wonna/lassi-core';
 import {
   serverContentId,
@@ -52,6 +53,16 @@ export async function readJsonCache<T>(
   }
 }
 
+/**
+ * Published by rename, so a concurrent reader sees the old file or the new one, never a torn write
+ * it would have to discard as damaged. Two writers race harmlessly: the last rename wins.
+ */
 export async function writeJsonCache(path: string, value: unknown, fs: LassiFs): Promise<void> {
-  await fs.writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`);
+    await fs.rename(temporary, path);
+  } finally {
+    if (await fs.exists(temporary)) await fs.unlink(temporary);
+  }
 }

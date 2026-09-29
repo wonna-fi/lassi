@@ -788,6 +788,7 @@ describe('lassi jira issue update: edit metadata only when a change needs it', (
       fetchedAt: '2026-09-04T10:00:00.000Z',
       fields: { customfield_10001: { allowedValues: [{ value: 'Platform' }, { value: 'Web' }] } },
     });
+    expect([...t.fs.files.keys()].filter((path) => path.endsWith('.tmp'))).toEqual([]);
 
     expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=platform'])).toBe(
       0
@@ -820,6 +821,34 @@ describe('lassi jira issue update: edit metadata only when a change needs it', (
     });
     expect(editmetaCalls(t)).toHaveLength(0);
     expect(writes(t)).toHaveLength(0);
+  });
+
+  it('decides by the value that is sent when a field is given twice', async () => {
+    const t = program();
+    expect(
+      await t.run([
+        'jira',
+        'issue',
+        'update',
+        'PROJ-123',
+        '--field',
+        'team=Web',
+        '--field',
+        'team=-',
+      ])
+    ).toBe(0);
+    expect(editmetaCalls(t)).toHaveLength(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10001: null },
+    });
+    expect(t.stdout()).toBe('updated PROJ-123 (team)\n');
+  });
+
+  it('treats a cache it cannot read as a miss and asks Jira', async () => {
+    const t = program({ files: { [`${EDITMETA_CACHE}/stray`]: '' } });
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+    expect(t.stderr()).toContain('warn: could not read cached edit metadata');
+    expect(editmetaCalls(t)).toHaveLength(1);
   });
 
   it('does not cache an empty answer, which a non-editable status gives', async () => {

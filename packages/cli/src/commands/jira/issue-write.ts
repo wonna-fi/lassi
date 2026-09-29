@@ -268,7 +268,9 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
       const context: HintContext = { product: 'jira', issueKey: key, operation: 'update' };
       const client = await jiraClient(ctx);
       const aliases = aliasesOf(ctx);
-      const pending: PendingField[] = [];
+      // Keyed by field id: a later --field replaces a file change or an earlier flag, and only the
+      // value that is sent decides whether edit metadata is needed.
+      const pending = new Map<string, PendingField>();
       let descriptionMarkdown: string | undefined;
       let cache: IssueCache | undefined;
       let probe: JiraIssue | undefined;
@@ -353,7 +355,7 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
         );
         for (const warning of diff.warnings) ctx.logger.warn(warning);
         for (const change of diff.changes) {
-          pending.push({
+          pending.set(change.id, {
             name: change.key,
             id: change.id,
             // null clears and a mapping is sent verbatim; neither is checked against anything.
@@ -374,7 +376,7 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
           throw new LassiError('usage', 'use --body (markdown) to change the description');
         }
         const schema = standardSchema(id);
-        pending.push({
+        pending.set(id, {
           name,
           id,
           needsMeta: !isLiteralFieldValue(raw) && needsFieldMeta(schema),
@@ -385,7 +387,7 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
 
       // Edit metadata can take Jira minutes to compute, so it is loaded only when a changed field
       // is checked against its allowed values, and then from the cache when it can be.
-      const needed = pending.filter((p) => p.needsMeta);
+      const needed = [...pending.values()].filter((p) => p.needsMeta);
       const editmeta =
         needed.length === 0
           ? undefined
@@ -395,7 +397,7 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
             });
       const fields: Record<string, unknown> = {};
       const changed: string[] = [];
-      for (const field of pending) {
+      for (const field of pending.values()) {
         try {
           fields[field.id] = field.convert(editmeta?.fields[field.id]);
         } catch (err) {
