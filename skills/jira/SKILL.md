@@ -47,7 +47,7 @@ Use a known key directly, JQL for field constraints, semantic search for meaning
 | Create | `lassi jira templates bug --out desc.md` (skeleton), fill it in, then `lassi jira issue create --template bug --summary "Login 500" --file desc.md`; without templates use `--project PROJ --type Bug`, inspect `issue createmeta`, and supply the required fields |
 | Transition | `lassi jira transition list PROJ-123`, then `lassi jira transition do PROJ-123 "In Review" --field resolution=Fixed` |
 | Attachments | `lassi jira attach get PROJ-123 --only "*.png"`; `lassi jira attach upload PROJ-123 ./log.txt` |
-| Links | `lassi jira link types`; `lassi jira link list PROJ-123`; `lassi jira link create PROJ-1 PROJ-2 --type "blocks"` |
+| Links | `lassi jira link types`; `lassi jira link list PROJ-123`; `lassi jira link create PROJ-1 PROJ-2 --type "blocks"`; `lassi jira link delete PROJ-1 PROJ-2 --type "blocks"` |
 | Field metadata | `lassi jira fields`; `lassi jira issue createmeta PROJ --type Bug`; `lassi jira issue editmeta PROJ-123` |
 
 Every write accepts `--dry-run`. `LASSI_READ_ONLY=1` in the environment blocks all writes (exit 7).

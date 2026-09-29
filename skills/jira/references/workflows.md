@@ -103,10 +103,12 @@ many landed; files above `attachments.maxSizeMb` are refused before anything is 
 lassi jira link types                               # names with inward/outward phrases
 lassi jira link create PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # prints the resolved sentence
 lassi jira link create PROJ-1 PROJ-2 --type "is blocked by"
+lassi jira link delete PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # the link `link list PROJ-1` shows that way
 ```
 
 Either the outward or the inward phrase is accepted; the CLI flips the direction and prints the
-sentence it will create.
+sentence it will create. `link delete` takes the sentence as `link list` prints it; when it names
+no link, the error lists the links that do exist between the two issues.
 
 ## Recover from errors
 

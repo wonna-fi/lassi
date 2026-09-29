@@ -2,13 +2,20 @@ export * from './client/types.js';
 export {
   assertCommentId,
   assertIssueKey,
+  assertLinkId,
   compileBranchPattern,
   ISSUE_KEY,
   isIssueKey,
   issueKeyFromBranch,
   type BranchKeyOptions,
 } from './client/keys.js';
-export { normalizeLinks, resolveLinkDirection, type ResolvedLink } from './client/links.js';
+export {
+  findLinks,
+  issueLinkRequest,
+  normalizeLinks,
+  resolveLinkDirection,
+  type ResolvedLink,
+} from './client/links.js';
 export { resolveTransition } from './client/transitions.js';
 export {
   createJiraClient,

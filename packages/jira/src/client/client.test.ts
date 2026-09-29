@@ -2,7 +2,7 @@ import { PassThrough } from 'node:stream';
 import { fakeFetch, type Route } from '@wonna/lassi-core/testing';
 import { describe, expect, it } from 'vitest';
 import { createJiraClient } from './index.js';
-import { resolveLinkDirection } from './links.js';
+import { findLinks, issueLinkRequest, resolveLinkDirection } from './links.js';
 import { resolveTransition } from './transitions.js';
 import type { JiraLinkType, JiraTransition } from './types.js';
 
@@ -478,6 +478,7 @@ describe('createJiraClient', () => {
         },
       },
       { method: 'POST', path: '/rest/api/2/issueLink', status: 201 },
+      { method: 'DELETE', path: '/rest/api/2/issueLink/10', status: 204 },
     ]);
     expect(await c.getLinkTypes()).toHaveLength(1);
     expect(await c.listLinks('PROJ-1')).toEqual([
@@ -498,12 +499,18 @@ describe('createJiraClient', () => {
         otherKey: 'PROJ-3',
       },
     ]);
-    await c.createLink({ typeName: 'Blocks', outwardKey: 'PROJ-1', inwardKey: 'PROJ-2' });
+    // "PROJ-1 blocks PROJ-2": Jira wants the source in inwardIssue.
+    await c.createLink({ typeName: 'Blocks', sourceKey: 'PROJ-1', targetKey: 'PROJ-2' });
     expect(JSON.parse(fetch.calls[2]?.bodyText ?? '')).toEqual({
       type: { name: 'Blocks' },
-      outwardIssue: { key: 'PROJ-1' },
-      inwardIssue: { key: 'PROJ-2' },
+      inwardIssue: { key: 'PROJ-1' },
+      outwardIssue: { key: 'PROJ-2' },
     });
+    await c.deleteLink('10');
+    expect(fetch.calls[3]).toMatchObject({ method: 'DELETE' });
+    expect(fetch.calls[3]?.url.pathname).toBe('/rest/api/2/issueLink/10');
+    await expect(c.deleteLink('..')).rejects.toMatchObject({ code: 'usage' });
+    expect(fetch.calls).toHaveLength(4);
   });
 
   it('validates mentions with a cache and bounded concurrency', async () => {
@@ -543,17 +550,52 @@ describe('resolveLinkDirection', () => {
 
   it('keeps direction for outward phrases and type names, flips for inward phrases', () => {
     expect(resolveLinkDirection(types, 'blocks', 'A-1', 'B-2')).toMatchObject({
-      outwardKey: 'A-1',
-      inwardKey: 'B-2',
+      sourceKey: 'A-1',
+      targetKey: 'B-2',
       sentence: 'A-1 blocks B-2',
     });
-    expect(resolveLinkDirection(types, 'Blocks', 'A-1', 'B-2').outwardKey).toBe('A-1');
+    expect(resolveLinkDirection(types, 'Blocks', 'A-1', 'B-2').sourceKey).toBe('A-1');
     expect(resolveLinkDirection(types, 'is blocked by', 'A-1', 'B-2')).toMatchObject({
-      outwardKey: 'B-2',
-      inwardKey: 'A-1',
+      sourceKey: 'B-2',
+      targetKey: 'A-1',
       sentence: 'A-1 is blocked by B-2',
     });
-    expect(resolveLinkDirection(types, 'relates to', 'A-1', 'B-2').outwardKey).toBe('A-1');
+    expect(resolveLinkDirection(types, 'relates to', 'A-1', 'B-2').sourceKey).toBe('A-1');
+  });
+
+  it('puts the source in inwardIssue, the way Jira reads POST /issueLink', () => {
+    expect(issueLinkRequest('Blocks', 'A-1', 'B-2')).toEqual({
+      type: { name: 'Blocks' },
+      inwardIssue: { key: 'A-1' },
+      outwardIssue: { key: 'B-2' },
+    });
+  });
+
+  it('finds the link as `link list` shows it from the first issue', () => {
+    const blocks = (direction: 'outward' | 'inward', otherKey: string, id: string) => ({
+      id,
+      typeName: 'Blocks',
+      direction,
+      description: direction === 'outward' ? 'blocks' : 'is blocked by',
+      otherKey,
+    });
+    const links = [
+      blocks('outward', 'B-2', '10'),
+      blocks('inward', 'B-2', '11'),
+      blocks('outward', 'C-3', '12'),
+    ];
+    const ids = (phrase: string) =>
+      findLinks(links, resolveLinkDirection(types, phrase, 'A-1', 'B-2'), 'A-1').map((l) => l.id);
+    expect(ids('blocks')).toEqual(['10']);
+    expect(ids('is blocked by')).toEqual(['11']);
+    expect(ids('clones')).toEqual([]);
+
+    // Relates reads the same both ways, so a link stored from B-2 still matches.
+    const relates = [
+      { ...blocks('inward', 'B-2', '13'), typeName: 'Relates', description: 'relates to' },
+    ];
+    const resolved = resolveLinkDirection(types, 'relates to', 'A-1', 'B-2');
+    expect(findLinks(relates, resolved, 'A-1').map((l) => l.id)).toEqual(['13']);
   });
 
   it('reports misses and ambiguity', () => {
