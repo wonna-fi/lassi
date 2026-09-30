@@ -128,7 +128,7 @@ export function registerIssue(jira: Command, deps: CliDeps, session: Session): v
       'issue as markdown with frontmatter; counts of comments, attachments and links are always shown (KEY may be "." for the current branch)'
     )
     .option('--out <file>', 'write the working file (and its cache) instead of printing')
-    .option('--comments [N]', 'include comments (all, or the newest N)')
+    .option('--comments [N]', 'include comments: all (bare flag or "all"), or the newest N')
     .option('--attachments', 'include the attachment table')
     .option('--links', 'include the links table')
     .option('--all', 'include comments, attachments and links')

@@ -530,15 +530,33 @@ describe('next steps after `.`', () => {
 });
 
 describe('--comments', () => {
-  it('rejects a value that is not a positive number instead of showing every comment', async () => {
-    // `0`, a negative and a word all used to mean "all", which is the opposite of what each says
-    // and the opposite of what every sibling numeric flag does.
-    for (const value of ['0', '-1', 'x', '0.5', '2.5']) {
+  it('takes "all" in any case, alone or next to --all, like the bare flag', async () => {
+    for (const args of [
+      ['--comments', 'all'],
+      ['--comments', ' ALL '],
+      ['--all', '--comments', 'all'],
+      ['--comments'],
+    ]) {
+      const t = makeTestProgram({ env: BOTH_PRODUCTS_ENV, routes: ROUTES });
+      expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', ...args, '--json'])).toBe(0);
+      expect(JSON.parse(t.stdout()).commentCoverage).toMatchObject({
+        total: 7,
+        shown: 7,
+        requested: 'all',
+        complete: true,
+      });
+    }
+  });
+
+  it('rejects a value that is not "all" or a positive number instead of showing every comment', async () => {
+    // `0`, a negative and any other word all used to mean "all", which is the opposite of what
+    // each says and the opposite of what every sibling numeric flag does.
+    for (const value of ['0', '-1', 'x', 'every', '0.5', '2.5']) {
       const t = makeTestProgram({ env: BOTH_PRODUCTS_ENV, routes: ROUTES });
       expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--comments', value])).toBe(2);
       expect(lastJsonLine(t.stderr())).toMatchObject({
         code: 'usage',
-        message: expect.stringContaining('--comments must be a positive whole number'),
+        message: `--comments takes "all" or a positive whole number, got "${value}"`,
       });
       // Before the fetch: a reachable Jira should not answer a request that was never going to be
       // used, and an unreachable one should not mask the usage error with its own failure.

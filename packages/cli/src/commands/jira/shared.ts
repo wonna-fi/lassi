@@ -77,18 +77,18 @@ export function group(parent: Command, name: string, description: string): Comma
   return parent.command(name).description(description);
 }
 
-/** `--comments [N]`: absent → undefined, bare flag → 'all', value → N. */
+/** `--comments [N]`: absent → undefined, bare flag or `all` → 'all', value → N. */
 export function commentsOption(value: string | boolean | undefined): number | 'all' | undefined {
   if (value === undefined || value === false) return undefined;
-  if (value === true) return 'all';
+  if (value === true || value.trim().toLowerCase() === 'all') return 'all';
   const n = Number(value);
-  // A positive *integer*: `0`, a negative and a word used to mean "all", the opposite of what any
-  // of them says, and a fraction below one floored to `0`, which `slice(-0)` then reads as the
-  // whole array — the same "show every comment" by another route.
+  // Otherwise a positive *integer*: `0`, a negative and any other word used to mean "all", the
+  // opposite of what any of them says, and a fraction below one floored to `0`, which `slice(-0)`
+  // then reads as the whole array — the same "show every comment" by another route.
   if (!Number.isInteger(n) || n <= 0) {
     throw new LassiError(
       'usage',
-      `--comments must be a positive whole number, got "${String(value)}"`
+      `--comments takes "all" or a positive whole number, got "${String(value)}"`
     );
   }
   return n;
