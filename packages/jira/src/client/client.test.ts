@@ -513,6 +513,42 @@ describe('createJiraClient', () => {
     expect(fetch.calls).toHaveLength(4);
   });
 
+  it('lists components and versions and creates a component, by project key', async () => {
+    const { c, fetch } = client([
+      {
+        path: '/rest/api/2/project/PROJ/components',
+        json: [{ id: '10', name: 'Backend', project: 'PROJ' }],
+      },
+      {
+        path: '/rest/api/2/project/PROJ/versions',
+        json: [{ id: '101', name: '2.0', archived: false, released: true }],
+      },
+      {
+        method: 'POST',
+        path: '/rest/api/2/component',
+        status: 201,
+        json: { id: '13', name: 'Mobile', project: 'PROJ' },
+      },
+    ]);
+    expect(await c.listComponents('proj')).toEqual([
+      { id: '10', name: 'Backend', project: 'PROJ' },
+    ]);
+    expect((await c.listVersions('PROJ')).map((v) => v.name)).toEqual(['2.0']);
+    expect(await c.createComponent({ project: 'proj', name: 'Mobile' })).toMatchObject({
+      id: '13',
+    });
+    expect(fetch.calls[2]).toMatchObject({ method: 'POST' });
+    expect(JSON.parse(fetch.calls[2]?.bodyText ?? '')).toEqual({ name: 'Mobile', project: 'PROJ' });
+    for (const bad of ['..', 'PROJ/../x', 'PROJ-1', '']) {
+      await expect(c.listComponents(bad)).rejects.toMatchObject({ code: 'usage' });
+    }
+    await expect(c.listVersions('.')).rejects.toMatchObject({
+      code: 'usage',
+      message: 'a project key is required here; "." stands only for an issue KEY',
+    });
+    expect(fetch.calls).toHaveLength(3);
+  });
+
   it('validates mentions with a cache and bounded concurrency', async () => {
     const { c, fetch } = client([
       {

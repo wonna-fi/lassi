@@ -3,6 +3,7 @@ export {
   assertCommentId,
   assertIssueKey,
   assertLinkId,
+  assertProjectKey,
   compileBranchPattern,
   ISSUE_KEY,
   isIssueKey,
@@ -17,6 +18,17 @@ export {
   type ResolvedLink,
 } from './client/links.js';
 export { resolveTransition } from './client/transitions.js';
+export {
+  componentCreateRequest,
+  componentRef,
+  componentUpdate,
+  planComponentAdd,
+  planComponentRemove,
+  type ComponentAddPlan,
+  type ComponentRef,
+} from './client/components.js';
+export { findByName } from './client/named.js';
+export { allowedVersions, fixVersionsUpdate, resolveVersions } from './client/versions.js';
 export {
   createJiraClient,
   type JiraClient,

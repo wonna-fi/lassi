@@ -109,6 +109,28 @@ export interface JiraIssueLink {
   otherStatus?: string;
 }
 
+/** A project component, as `GET /project/{key}/components` returns it. */
+export interface JiraComponent {
+  id: string;
+  name: string;
+  description?: string;
+  lead?: JiraUser;
+  /** Only on Jira versions that can archive components. */
+  archived?: boolean;
+  /** The project key. */
+  project?: string;
+}
+
+/** A project version, as `GET /project/{key}/versions` returns it. */
+export interface JiraVersion {
+  id: string;
+  name: string;
+  description?: string;
+  archived: boolean;
+  released: boolean;
+  releaseDate?: string;
+}
+
 export interface JiraIssueFields {
   summary?: string;
   description?: string | null;

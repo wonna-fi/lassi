@@ -8,9 +8,9 @@ function fullName(cmd: Command): string {
   return parts.join(' ');
 }
 
-function leafSection(cmd: Command, helper: LassiHelp): string {
+function leafSection(cmd: Command, heading: string, helper: LassiHelp): string {
   const lines: string[] = [];
-  lines.push(`#### ${fullName(cmd)}`, '');
+  lines.push(`${heading} ${fullName(cmd)}`, '');
   lines.push('```', helper.commandUsage(cmd), '```', '');
   const description = helper.commandDescription(cmd);
   if (description) lines.push(description, '');
@@ -47,13 +47,18 @@ function leafSection(cmd: Command, helper: LassiHelp): string {
   return lines.join('\n');
 }
 
+/**
+ * A group one level below its parent (`## lassi jira`, `### lassi jira issue`, `#### lassi jira issue
+ * component`); a command at `####`, or one below a group that is already there, so a group nested in
+ * `issue` does not read as a sibling of it.
+ */
 function walk(cmd: Command, depth: number, helper: LassiHelp, out: string[]): void {
   const children = cmd.commands.filter((c) => !(c as unknown as { _hidden?: boolean })._hidden);
   if (children.length === 0) {
-    out.push(leafSection(cmd, helper));
+    out.push(leafSection(cmd, '#'.repeat(Math.max(4, depth + 1)), helper));
     return;
   }
-  const heading = depth === 1 ? '##' : '###';
+  const heading = '#'.repeat(depth + 1);
   const description = helper.commandDescription(cmd);
   out.push(`${heading} ${fullName(cmd)}${description ? ` — ${description}` : ''}`, '');
   for (const child of children) walk(child, depth + 1, helper, out);
