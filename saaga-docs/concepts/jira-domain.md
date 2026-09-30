@@ -75,6 +75,8 @@ Comment IDs are decimal strings. The exported `assertCommentId()` validates them
 
 Field aliases are explicit configuration entries. Standard IDs and `customfield_N` may also be addressed directly, and frontmatter `type` maps to Jira's `issuetype`. Unknown names are returned separately instead of being sent to Jira.
 
+`matchesField()` compares changelog filters with a history item's display name, explicit field ID, or configured alias; filter names and display names are case-insensitive. For system history names covering components, fix versions, affected versions, and issue links, it also recognizes the corresponding system ID and edit-screen names when Jira omits `fieldId`. A present `fieldId` controls that system-field equivalence: a custom field named `Component` does not match `components`, although a direct filter for `Component` still matches its display name. Configured aliases resolve through an explicit `fieldId`, so they do not identify older items that lack one.
+
 API field objects become compact authored values where possible: users become usernames, options become values, named entities become names, and projects become keys. Objects that cannot be safely simplified remain mappings. In the reverse direction, the field schema shapes users, projects, options, arrays, components, versions, and other named values for Jira. The schema comes from loaded metadata, from the fetch that wrote a working file, or from the standard field table.
 
 An empty value or `-` clears a `--field`; JSON-looking input is parsed and sent as the explicit escape hatch. Values outside a field's advertised allowed set produce a structured validation failure.
@@ -115,6 +117,7 @@ Transitions resolve case-insensitively by exact ID or name. No match is a valida
 | `@wonna/lassi-jira` | `allowedVersions()` / `resolveVersions()` / `fixVersionsUpdate()` | Select assignable project versions and build an issue update. |
 | `JiraClient` | `listComponents()` / `createComponent()` / `listVersions()` | Read project catalogs and create a project component. |
 | `@wonna/lassi-jira` | `flattenChangelog()` | Produces ordered, filterable field-change rows. |
+| `@wonna/lassi-jira` | `matchesField()` | Tests one history item against a changelog field filter. |
 | `@wonna/lassi-jira` | `buildDigest()` | Classifies fetched activity into digest sections and actions. |
 
 `JiraClient` is the public remote boundary. Its methods cover server identity, issue get/search/create/update, create/edit metadata, changelog, comment CRUD, attachment download/upload, transition list/apply, link types/list/create/delete, project component/version catalogs, component creation, and paginated export-oriented reads.
