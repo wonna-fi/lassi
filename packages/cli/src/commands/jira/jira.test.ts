@@ -664,6 +664,45 @@ describe('lassi jira issue changelog', () => {
     );
   });
 
+  it('finds a components change with --fields components when Jira sends only "Component"', async () => {
+    const t = makeTestProgram({
+      env: BOTH_PRODUCTS_ENV,
+      routes: [
+        {
+          path: '/rest/api/2/issue/PROJ-123',
+          json: {
+            key: 'PROJ-123',
+            fields: { summary: 'S', status: { name: 'Open' } },
+            changelog: {
+              total: 1,
+              histories: [
+                {
+                  id: '1',
+                  created: '2026-09-02T09:00:00.000+0300',
+                  author: { name: 'jdoe', displayName: 'J D' },
+                  items: [
+                    {
+                      field: 'Component',
+                      fieldtype: 'jira',
+                      from: null,
+                      fromString: null,
+                      to: '10',
+                      toString: 'Backend',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+    expect(await t.run(['jira', 'issue', 'changelog', 'PROJ-123', '--fields', 'components'])).toBe(
+      0
+    );
+    expect(t.stdout()).toContain('| jdoe | Component | - | Backend |');
+  });
+
   it('cuts a long changed value for the table and the agent payload, never for --json', async () => {
     const long = 'x'.repeat(400);
     const t = makeTestProgram({

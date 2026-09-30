@@ -148,6 +148,48 @@ describe('matchesField', () => {
     expect(matchesField(item, 'team', ALIASES)).toBe(true);
     expect(matchesField(item, 'customfield_10001', ALIASES)).toBe(false);
   });
+
+  it('matches a system field by its id or edit-screen name when Jira sends only the history name', () => {
+    const item = (field: string) => ({
+      field,
+      from: null,
+      fromString: null,
+      to: null,
+      toString: null,
+    });
+    for (const wanted of ['components', 'Components', 'Component/s', 'Component']) {
+      expect(matchesField(item('Component'), wanted)).toBe(true);
+    }
+    for (const wanted of ['fixVersions', 'Fix Version/s', 'Fix Version']) {
+      expect(matchesField(item('Fix Version'), wanted)).toBe(true);
+    }
+    for (const wanted of ['versions', 'Affects Version/s']) {
+      expect(matchesField(item('Version'), wanted)).toBe(true);
+    }
+    expect(matchesField(item('Link'), 'issuelinks')).toBe(true);
+    // Each name belongs to one field: affects versions are not fix versions.
+    expect(matchesField(item('Fix Version'), 'versions')).toBe(false);
+    expect(matchesField(item('Version'), 'fixVersions')).toBe(false);
+    expect(matchesField(item('Component'), 'labels')).toBe(false);
+    expect(matchesField(item('constructor'), 'components')).toBe(false);
+  });
+
+  it('trusts a fieldId over the history name', () => {
+    const named = (field: string, fieldId: string) => ({
+      field,
+      fieldId,
+      from: null,
+      fromString: null,
+      to: null,
+      toString: null,
+    });
+    expect(matchesField(named('Component', 'components'), 'Component/s')).toBe(true);
+    expect(matchesField(named('Fix Version', 'fixVersions'), 'fixVersions')).toBe(true);
+    // A custom field called "Component" is not the components field.
+    expect(matchesField(named('Component', 'customfield_123'), 'components')).toBe(false);
+    expect(matchesField(named('Component', 'customfield_123'), 'Component/s')).toBe(false);
+    expect(matchesField(named('Component', 'customfield_123'), 'Component')).toBe(true);
+  });
 });
 
 describe('sinceToJql', () => {

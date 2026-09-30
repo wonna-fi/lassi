@@ -21,14 +21,39 @@ export interface FlattenOptions {
   aliases?: Record<string, string>;
 }
 
+/**
+ * System fields whose history name matches neither their id nor their edit-screen name: Jira
+ * labels a components change "Component", and only Jira 8.3+ adds the `fieldId` that `components`
+ * would match. Keyed by the history name, lower-cased; `names` are the other accepted spellings.
+ */
+const HISTORY_NAMES: Record<string, { id: string; names: readonly string[] }> = {
+  component: { id: 'components', names: ['component/s'] },
+  'fix version': { id: 'fixVersions', names: ['fix versions', 'fix version/s'] },
+  version: { id: 'versions', names: ['affects versions', 'affects version/s'] },
+  link: { id: 'issuelinks', names: [] },
+};
+
+/** Whether `w` names the system field behind this history name, when that is what the item is. */
+function matchesHistoryName(item: JiraChangeItem, field: string, w: string): boolean {
+  // Own keys only: a history name such as "constructor" must not reach Object.prototype.
+  if (!Object.hasOwn(HISTORY_NAMES, field)) return false;
+  const system = HISTORY_NAMES[field] as { id: string; names: readonly string[] };
+  // A `fieldId` is authoritative: a custom field that happens to be called "Component" is not
+  // the components field.
+  if (item.fieldId !== undefined && item.fieldId !== system.id) return false;
+  return w === system.id.toLowerCase() || system.names.includes(w);
+}
+
 export function matchesField(
   item: JiraChangeItem,
   wanted: string,
   aliases: Record<string, string> = {}
 ): boolean {
   const w = wanted.trim().toLowerCase();
-  if (w === item.field.toLowerCase()) return true;
+  const field = item.field.toLowerCase();
+  if (w === field) return true;
   if (item.fieldId !== undefined && w === item.fieldId.toLowerCase()) return true;
+  if (matchesHistoryName(item, field, w)) return true;
   const alias = Object.entries(aliases).find(([a]) => a.toLowerCase() === w);
   return alias !== undefined && alias[1] === item.fieldId;
 }
