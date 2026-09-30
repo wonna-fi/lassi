@@ -1,4 +1,4 @@
-# Generated: 2026-09-30T10:26:16.415Z
+# Generated: 2026-09-30T11:41:34.696Z
 d5264cbf039409b6fbd96cea7eb5c1319ad0938e .editorconfig
 72cb313431b685a2f68f8f44c20a89d5cb3c9cae .gitattributes
 9b49586cca6fd7b50bb08c6feeb3c2495c520cbd .github/workflows/ci.yml
@@ -344,7 +344,7 @@ fe3647d3a0e5d923cf4cc087403f4effab75b8f8 packages/cli/src/commands/jira/issue-ke
 f05a8eb44ad40f6de9fa2998af803f86b61d99d8 packages/cli/src/commands/jira/issue-write.ts
 896bd9b6c28f0f3c92da6799b560d8fa59fc0d9f packages/cli/src/commands/jira/issue.ts
 a5b196b1179b3409996ebc6a6533284967e321c8 packages/cli/src/commands/jira/jira-write.test.ts
-c7c1186d70865e1eec6c7efdfb62ddc8882421e5 packages/cli/src/commands/jira/jira.test.ts
+76227388d98bb9f9be1808adae735349a318e2ab packages/cli/src/commands/jira/jira.test.ts
 d3be97b7bc16389f78ae23266b9d5493521577db packages/cli/src/commands/jira/reference.ts
 0536b4c0ed7279ddc420163522241d10f8c8c0db packages/cli/src/commands/jira/shared.ts
 2a81bc01cb2f36f9a12de9ab19652fca434a7215 packages/cli/src/commands/jira/templates.ts
@@ -530,8 +530,8 @@ e395961b3571919d275660882aa0eb699703ef96 packages/core/src/time/atlassian-date.t
 535ed93c68d5869b195f6e811b83849c90f4bd8b packages/core/src/time/time.test.ts
 20138b8bcb8a75a2b799307142ee262e4c805fe6 packages/core/tsconfig.json
 f5c280c7caa44bacbeba010f61b7009251b4e0b2 packages/jira/package.json
-182400cf3b157ba5bbd7e67cdb738574a1c95512 packages/jira/src/changelog/flatten.test.ts
-665fadc11561a4c921fa5d6e10405e5cb7687f99 packages/jira/src/changelog/flatten.ts
+22ecd0a5bb128a867edb4eff8a09d87072e03bdd packages/jira/src/changelog/flatten.test.ts
+23f7fb04137e84363616b64caebf6396ae6e7f97 packages/jira/src/changelog/flatten.ts
 07a6d97bf73eb45228c3cd475c7dc0dd53ab58f8 packages/jira/src/changelog/index.ts
 39f2131ca68f9957e6d7f89b6a36fc004ee548ed packages/jira/src/client/client.test.ts
 3f0b8fa894718dfd1d2badce18868f1602808294 packages/jira/src/client/comments.test.ts

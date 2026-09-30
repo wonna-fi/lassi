@@ -1,6 +1,7 @@
 ---
 title: "Feature: Jira Issue Workflows"
 type: feature
+last_verified: 2026-09-30
 sources:
   - packages/jira/package.json
   - packages/cli/src/commands/shared/{storage,export-manifest}.ts
@@ -104,7 +105,7 @@ The public Jira client and field conversion services used by these commands are 
 | `jira issue component add KEY NAME... [--create]` / `jira issue component remove KEY NAME...` | Assign existing or newly created components, or remove assignments while leaving project components intact. |
 | `jira issue fix-version set KEY VERSION... [--add]` | Replace fix versions, or add to the issue's current set. |
 | `jira issue create/update` | Create from flags/templates or update fields, body, or a working file. |
-| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. |
+| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID and finds component, version, and link changes even when Jira omits field IDs; see [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
 | `jira comment list/add/edit/delete` | Read and mutate issue comments. |
 | `jira attachment get/upload` | Download bounded attachments or upload local files. |
 | `jira transition list/do` | Inspect and execute available transitions with screen fields. |
