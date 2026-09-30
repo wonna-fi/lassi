@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { LassiError } from '@wonna/lassi-core';
+import { LassiError, isLassiError } from '@wonna/lassi-core';
 import {
   aliasFor,
   createJiraClient,
@@ -26,6 +26,30 @@ export function jiraClient(ctx: Context): Promise<JiraClient> {
 
 export function aliasesOf(ctx: Context): Record<string, string> {
   return ctx.config.jira.fields;
+}
+
+/**
+ * Hints for a request under `/project/{key}` or a component create, which the catalogue has no row
+ * for: a project key that names nothing, and a create without the permission it needs, which Jira
+ * answers 403 and the catalogue would read as a bad token.
+ */
+export async function withProjectHints<T>(
+  project: string,
+  run: () => Promise<T>,
+  opts: { creatingComponent?: boolean } = {}
+): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (isLassiError(err) && err.hint === undefined) {
+      if (err.code === 'not_found') {
+        err.hint = `check the project key ${project} (the part of an issue key before the dash)`;
+      } else if (err.code === 'auth' && err.http === 403 && opts.creatingComponent) {
+        err.hint = `creating a component needs the Administer Projects permission in ${project}; ask a project admin, or use an existing component (\`lassi jira component list ${project}\`)`;
+      }
+    }
+    throw err;
+  }
 }
 
 function allowedLabel(meta: JiraFieldMeta): string {

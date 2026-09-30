@@ -110,6 +110,26 @@ Either the outward or the inward phrase is accepted; the CLI flips the direction
 sentence it will create. `link delete` takes the sentence as `link list` prints it; when it names
 no link, the error lists the links that do exist between the two issues.
 
+## Components and fix versions
+
+```sh
+lassi jira component list PROJ                                   # the project's components
+lassi jira issue component add PROJ-123 Backend "Data import" --dry-run
+lassi jira issue component add PROJ-123 Mobile --create          # creates Mobile in PROJ first
+lassi jira issue component remove PROJ-123 Backend
+lassi jira version list PROJ                                     # versions an issue can take
+lassi jira issue fix-version set PROJ-123 2.1                    # replaces the fix versions
+lassi jira issue fix-version set PROJ-123 2.2 --add              # keeps the ones it has
+```
+
+Names match in any case and every name is checked before anything is sent. `issue component add`
+leaves the issue's other components alone, refuses a component the project does not have unless
+`--create` is passed, and never creates one for an archived name; creating needs the Administer
+Projects permission. `issue component remove` refuses a component the issue does not have. A fix
+version is always one of the project's versions that is not archived; the error lists them, and
+setting one needs the Resolve Issues permission. Prefer these commands to
+`issue update --field components=…` or `fixVersions=…`, which replace the whole list unchecked.
+
 ## Recover from errors
 
 1. Read the JSON line on stderr: `code`, `message`, `errors` (Jira's field map, verbatim),

@@ -1,4 +1,5 @@
 import { readComments, type CommentRead } from './comments.js';
+import { componentCreateRequest } from './components.js';
 import type { Writable } from 'node:stream';
 import {
   LassiError,
@@ -9,7 +10,7 @@ import {
   type HttpClientOptions,
   type Logger,
 } from '@wonna/lassi-core';
-import { assertCommentId, assertIssueKey, assertLinkId } from './keys.js';
+import { assertCommentId, assertIssueKey, assertLinkId, assertProjectKey } from './keys.js';
 import { issueLinkRequest, normalizeLinks } from './links.js';
 import { CreatemetaResolver, editmeta, listFields, withIds } from './meta.js';
 import type {
@@ -19,6 +20,7 @@ import type {
   JiraChangelogResult,
   JiraComment,
   JiraCommentPage,
+  JiraComponent,
   JiraCreateMeta,
   JiraIssueTypeList,
   JiraFieldDef,
@@ -32,6 +34,7 @@ import type {
   JiraStatus,
   JiraTransition,
   JiraUser,
+  JiraVersion,
 } from './types.js';
 
 export type JiraClientOptions =
@@ -132,6 +135,16 @@ export interface JiraClient {
   createLink(req: { typeName: string; sourceKey: string; targetKey: string }): Promise<void>;
   deleteLink(id: string): Promise<void>;
 
+  listComponents(project: string): Promise<JiraComponent[]>;
+  /** Needs the Administer Projects permission in `project`. */
+  createComponent(req: {
+    project: string;
+    name: string;
+    description?: string;
+  }): Promise<JiraComponent>;
+  /** Archived versions included; `allowedVersions()` keeps the ones an issue can be given. */
+  listVersions(project: string): Promise<JiraVersion[]>;
+
   getUser(username: string): Promise<JiraUser>;
   /** Unknown usernames (404) are returned, never thrown; other failures propagate. */
   validateMentions(usernames: string[]): Promise<{ known: string[]; unknown: string[] }>;
@@ -155,6 +168,8 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
   const userCache = new Map<string, JiraUser | null>();
   const issuePath = (key: string): string =>
     `/rest/api/2/issue/${encodeURIComponent(assertIssueKey(key))}`;
+  const projectPath = (project: string): string =>
+    `/rest/api/2/project/${encodeURIComponent(assertProjectKey(project))}`;
 
   const client: JiraClient = {
     baseUrl,
@@ -402,6 +417,27 @@ export function createJiraClient(opts: JiraClientOptions): JiraClient {
       await http.delete(`/rest/api/2/issueLink/${assertLinkId(id)}`, {
         context: { product: 'jira', operation: 'link' },
       });
+    },
+
+    // No `project` in these contexts: the hint catalogue reads a project without an issue key as
+    // an issue create and would point at createmeta. The commands give their own hints.
+    async listComponents(project) {
+      const raw = await http.get<JiraComponent[]>(`${projectPath(project)}/components`, {
+        context: { product: 'jira' },
+      });
+      return raw ?? [];
+    },
+    createComponent: (req) =>
+      http.post<JiraComponent>(
+        '/rest/api/2/component',
+        componentCreateRequest({ ...req, project: assertProjectKey(req.project) }),
+        { context: { product: 'jira', operation: 'other' } }
+      ),
+    async listVersions(project) {
+      const raw = await http.get<JiraVersion[]>(`${projectPath(project)}/versions`, {
+        context: { product: 'jira' },
+      });
+      return raw ?? [];
     },
 
     async getUser(username) {

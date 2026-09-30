@@ -17,6 +17,23 @@ export function assertIssueKey(value: string): string {
   return value;
 }
 
+/** an uppercase project key, the part of an issue key before the dash. */
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]+$/;
+
+/** A project key, upper-cased: it names a path segment of `/project/{key}/…`. */
+export function assertProjectKey(value: string): string {
+  const key = value.trim().toUpperCase();
+  if (!PROJECT_KEY.test(key)) {
+    throw new LassiError(
+      'usage',
+      value.trim() === '.'
+        ? 'a project key is required here; "." stands only for an issue KEY'
+        : `not a Jira project key: ${value} (expected e.g. PROJ)`
+    );
+  }
+  return key;
+}
+
 /** Link ids are decimal, like comment ids: they name a path segment of `/issueLink/{id}`. */
 export function assertLinkId(value: string): string {
   if (!/^\d+$/.test(value)) {

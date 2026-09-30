@@ -59,6 +59,23 @@ describe('program', () => {
     expect(md.split('--dry-run').length - 1).toBe(1);
   });
 
+  it('help --all nests a group inside `jira issue` one heading level below it', async () => {
+    const t = makeTestProgram();
+    expect(await t.run(['help', '--all'])).toBe(0);
+    const headings = t
+      .stdout()
+      .split('\n')
+      .filter((l) => /^#+ lassi jira issue (component|update|export)\b/.test(l))
+      .map((l) => l.replace(/ — .*/, ''));
+    expect(headings).toEqual([
+      '#### lassi jira issue update',
+      '#### lassi jira issue component',
+      '##### lassi jira issue component add',
+      '##### lassi jira issue component remove',
+      '#### lassi jira issue export',
+    ]);
+  });
+
   it('help <command> prints that command help; unknown → 2', async () => {
     const t = makeTestProgram();
     expect(await t.run(['help', 'config', 'show'])).toBe(0);

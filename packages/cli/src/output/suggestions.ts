@@ -57,7 +57,18 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
       return [`Run \`lassi jira issue get ${str(data['key'], '<KEY>')}\` to verify the new issue.`];
     case 'jira issue update':
     case 'jira transition do':
+    case 'jira issue component add':
+    case 'jira issue component remove':
+    case 'jira issue fix-version set':
       return [`Run \`lassi jira issue get ${str(data['key'], arg(0, '<KEY>'))}\` to verify.`];
+    case 'jira component list':
+      return [
+        'Run `lassi jira issue component add <KEY> "<name>" --dry-run` (--create for a new component).',
+      ];
+    case 'jira version list':
+      return [
+        'Run `lassi jira issue fix-version set <KEY> "<version>" --dry-run` (--add to keep the others).',
+      ];
     case 'jira issue createmeta':
       return [
         `Run \`lassi jira issue create --project ${arg(0, '<P>')} --type <T> --summary "..." --field alias=value --dry-run\`.`,

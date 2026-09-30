@@ -14,10 +14,12 @@ import {
   jiraClient,
   renderFieldMetaTable,
 } from './shared.js';
+import { registerIssueComponent } from './component.js';
 import { fetchEditmeta } from './editmeta.js';
 import { registerIssueExport } from './export.js';
 import { resolveIssueKey } from './issue-key.js';
 import { registerIssueWrites } from './issue-write.js';
+import { registerIssueFixVersion } from './version.js';
 import {
   buildIssueDocument,
   loadIssueComments,
@@ -381,5 +383,7 @@ export function registerIssue(jira: Command, deps: CliDeps, session: Session): v
   });
 
   registerIssueWrites(issue, deps, session);
+  registerIssueComponent(issue, deps, session);
+  registerIssueFixVersion(issue, deps, session);
   registerIssueExport(issue, deps, session);
 }
