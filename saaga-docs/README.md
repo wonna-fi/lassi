@@ -20,8 +20,8 @@ Read in order: the architecture, then the core concepts, then the workflows.
 The concepts the rest of the corpus links to most often. Everything else assumes them.
 
 - [Runtime Context](./concepts/runtime-context.md) — Effective configuration, credentials, injected host services, and filesystem access for each command.
+- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, project components and versions, fields, comments, links, transitions, history, and client APIs.
 - [Markdown Document](./concepts/markdown-document.md) — Canonical mdast and Markdown representation, frontmatter, mentions, and loss-preserving dialect fences.
-- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, fields, comments, attachments, links, transitions, history, and client APIs.
 - [Working File](./concepts/working-file.md) — Editable fields, reserved metadata, cache identity, and local or server drift state.
 
 ## Workflows and Features
@@ -30,7 +30,7 @@ What the system does, end to end, in index order.
 
 - [Command Execution](./features/command-execution.md) — End-to-end command dispatch, output selection, write safety, and error rendering.
 - [Working File Lifecycle](./features/working-file-lifecycle.md) — Export, edit, diff, validate, write, and refresh path-specific working snapshots safely.
-- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and safely update Jira issues and related activity.
+- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and safely update Jira issues, components, fix versions, and related activity.
 - [Jira Wiki Conversion](./features/jira-wiki-conversion.md) — Bidirectional Jira wiki and Markdown conversion with explicit fidelity warnings.
 - [Confluence Page Workflows](./features/confluence-page-workflows.md) — Find, export, create, validate, and safely update pages and related content.
 - [Confluence Storage Conversion](./features/confluence-storage-conversion.md) — Loss-aware storage/view HTML and Markdown conversion with inferred writer forms and fidelity checks.

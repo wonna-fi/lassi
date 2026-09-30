@@ -13,14 +13,13 @@ sources:
   - packages/cli/src/workfile/*.ts
   - packages/jira/src/index.ts
   - packages/jira/src/{client,fields,issue,changelog,digest}/**/*.ts
-last_verified: 2026-09-29
 ---
 
 # Feature: Jira Issue Workflows
 
 ## Overview
 
-Jira workflows let a user inspect, export, create, and safely update issues and their related comments, attachments, links, transitions, and activity digests. Commands share Jira identity and field rules while keeping remote writes behind Lassi's read-only and dry-run controls.
+Jira workflows let a user inspect, export, create, and safely update issues, project components, fix versions, and related comments, attachments, links, transitions, and activity digests. Commands share Jira identity and field rules while keeping remote writes behind Lassi's read-only and dry-run controls.
 
 ## Key Concepts
 
@@ -39,10 +38,14 @@ Before working with this feature, understand these concepts:
 3. Inspect the issue, search with JQL, or query create/edit metadata before authoring fields.
 4. For local editing, run `jira issue get KEY --out file.md`, edit writable frontmatter and Markdown, then run `jira issue update KEY --file file.md --if-unchanged`. The flag enables a server-drift check; omitting it skips that check. See [Working File Lifecycle](./working-file-lifecycle.md) for caching and refresh behavior.
 5. Use the sibling commands for comments, attachments, transitions, bulk export, or a personal activity digest. To remove a link, inspect `jira link list KEY1`, then run `jira link delete KEY1 KEY2 --type PHRASE` with the relationship as displayed from KEY1.
+6. To assign project components, inspect `jira component list PROJECT`, then run `jira issue component add KEY NAME...` or `jira issue component remove KEY NAME...`. Add `--create` to make missing project components before assigning them; `jira component create PROJECT NAME --description TEXT` creates one independently.
+7. To choose fix versions, inspect `jira version list PROJECT`, then run `jira issue fix-version set KEY VERSION...`. This replaces the issue's fix versions; `--add` retains its current ones.
 
 ### Validation Rules
 
-- Direct issue keys must match the Jira key shape; branch-derived lookup must find exactly one usable key.
+- Direct issue keys must match the Jira key shape. Branch lookup selects the first capture from a configured pattern; without one, it selects the first default-project match, then the first issue-shaped match anywhere. It accepts a selected key only if its shape is valid and does not reject branches with multiple keys.
+- Project arguments are trimmed, uppercased, and validated as project keys; `.` works only for an issue key.
+- `jira issue get KEY --comments` and `--comments all` include all comments. A numeric value must be a positive whole number and selects the newest N; invalid values fail even alongside `--all`.
 - `--field` uses `alias=value`; configured aliases, standard fields, and raw custom-field IDs are accepted.
 - Create requires project, issue type, and summary after template and flag merging. The live create-metadata check rejects other required fields only when unset and without a server default; it exempts auto-filled `project`, `issuetype`, and `reporter`.
 - Body sources are mutually exclusive where commands accept both inline Markdown and a file or stdin.
@@ -52,6 +55,9 @@ Before working with this feature, understand these concepts:
 - Transition names or IDs must select exactly one available transition; transition screen fields use that transition's metadata.
 - Comment deletion is limited to the current user's comments unless `--any` is supplied.
 - Link create and delete require two distinct issue keys and `--type`; deletion needs exactly one link matching the displayed relationship from the first issue.
+- Component add and fix-version set resolve names against project catalogs; component remove resolves names against components assigned to the issue. Each check precedes its respective write. Exact spelling wins over case-insensitive matching; ambiguous matches require exact spelling. See [Jira Domain](../concepts/jira-domain.md) for the resolution and request contracts.
+- Component add rejects unknown names unless `--create` is set and rejects an archived project component when it is not already on the issue. Component remove requires every requested name to be on the issue; duplicate names resolve once.
+- Fix-version set accepts only non-archived project versions, released or not. Unknown names fail as `not_found`, archived names as `validation`; duplicate versions resolve once.
 - Numeric limits and attachment size values must be positive; issue search `--all` still stops at its hard cap.
 - All remote mutations pass through the shared [Command Execution](./command-execution.md) write guard.
 
@@ -72,6 +78,11 @@ Before working with this feature, understand these concepts:
 | Attachment exceeds the configured or command limit | Download skips it and reports the skip; accepted files retain collision-safe names. |
 | Batch export encounters existing or failed files | Per-issue results are retained and the batch error follows successful output. |
 | Digest JQL fragment contains unsafe clauses | It is rejected before combining with the built-in section queries. |
+| Adding components already on the issue | Return `no changes` when all names are already assigned; otherwise report them as unchanged alongside additions. |
+| Fix-version set receives the current set, or `--add` receives only current versions | Return `no changes` without an issue update. |
+| Replacing fix versions would drop an archived version already on the issue | Warn that it cannot be assigned again; `--add` retains it. |
+| Component creation succeeds but a later create or issue update fails | Return the created components as partial success, then surface the error. Re-running can assign the now-existing components. |
+| A project lookup fails or component creation is forbidden | A missing project gets a project-key hint; a create 403 points to the Administer Projects permission. |
 
 ## Technical Implementation
 
@@ -88,6 +99,10 @@ The public Jira client and field conversion services used by these commands are 
 | Command | Purpose |
 |-----------|---------|
 | `jira issue get/search/export` | Read one issue, query Jira, or save issue working files in bulk. |
+| `jira component list PROJECT` / `jira component create PROJECT NAME [--description TEXT]` | List project components or create a named component with an optional description. |
+| `jira version list PROJECT` | List non-archived versions available as fix versions, including released versions. |
+| `jira issue component add KEY NAME... [--create]` / `jira issue component remove KEY NAME...` | Assign existing or newly created components, or remove assignments while leaving project components intact. |
+| `jira issue fix-version set KEY VERSION... [--add]` | Replace fix versions, or add to the issue's current set. |
 | `jira issue create/update` | Create from flags/templates or update fields, body, or a working file. |
 | `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. |
 | `jira comment list/add/edit/delete` | Read and mutate issue comments. |
@@ -101,7 +116,7 @@ Command registration starts at `registerJira()`, which attaches every group to t
 
 Create merges template defaults before explicit flags, resolves live metadata, maps aliases, validates required fields, converts the Markdown description to Jira wiki markup, then calls the client. Update follows the same coercion rules, but loads edit metadata only when a changed field needs it; a transition uses its screen's metadata instead.
 
-Issue retrieval requests expansion fields only when needed. Comments can mean all or the newest count; attachments and links become generated read-only sections. `--out` writes the selected Markdown path and a per-path baseline under `.lassi/cache/jira/`, which later updates use to compute field and body changes.
+Issue retrieval requests expansion fields only when needed. A bare `--comments` or `--comments all` includes all comments; a positive integer selects the newest count. Attachments and links become generated read-only sections. `--out` writes the selected Markdown path and a per-path baseline under `.lassi/cache/jira/`, which later updates use to compute field and body changes.
 
 The command families use these product-specific paths:
 
@@ -115,6 +130,14 @@ The command families use these product-specific paths:
 | Transition | Resolve the available transition and coerce its screen fields. | Apply transition fields and optional comment. |
 | Link create | Resolve type wording to the sentence printed for the first and second issue; build the request described in [Jira Domain](../concepts/jira-domain.md). | POST the link in that sentence's direction. |
 | Link delete | Resolve the displayed phrase, list links from the first issue, and require one match by type, other key, and direction. | Preview the concrete DELETE path, then delete by validated numeric link ID. |
+| Project component create | Validate project and name; check for a matching existing component. | Preview and POST the project component, with optional description. |
+| Issue component add | Fetch issue project and current components; accept already-assigned names unchanged, then resolve new assignments against the project catalog before writing. | With `--create`, guard and POST each missing project component first; then guard and PUT additive issue operations. |
+| Issue component remove | Fetch current issue components and require every requested name to match. | Guard and PUT removal operations; project components remain available. |
+| Issue fix-version set | Fetch issue project and current fix versions; resolve every requested name from project versions. | Guard and PUT a replacement list, or additive operations with `--add`. |
+
+Each component create and the final issue update has its own `guardWrite()` call. A dry run with `--create` collects previews for every planned POST and the final PUT; names stand in for IDs that do not exist yet. An actual run uses the returned IDs. If an earlier create succeeded before a later Jira error, the command returns that partial result and the shared error path prints it before a nonzero exit. The common preview and output rules are in [Command Execution](./command-execution.md).
+
+Project component listing includes archived entries and marks them in output. Version listing filters archived entries before rendering Markdown, JSON, or AXI. The project catalogs, types, and request semantics are defined in [Jira Domain](../concepts/jira-domain.md).
 
 Edit metadata is slow on large projects because Jira computes allowed values for every field on the edit screen. Update first collects changed file fields and `--field` values by resolved field ID, keeping the last value for each ID. It then decides which final values need metadata. Only when one does, it probes the issue for project and issue type, or reuses the issue fetched for `--if-unchanged`. It uses a fresh cache entry when available, otherwise fetches live metadata. Next it converts the selected values, reports cached allowed-value failures with a refresh hint, builds the payload, and passes it through the write guard before sending. `jira issue editmeta` always requests live metadata and stores a non-empty answer for later updates. Cache identity, validity, and the request deadline are in [Jira Domain](../concepts/jira-domain.md).
 

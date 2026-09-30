@@ -15,8 +15,8 @@ definition verbatim — to change one, change the INDEX row it comes from.
 - [Confluence Storage Conversion](./features/confluence-storage-conversion.md) — Loss-aware storage/view HTML and Markdown conversion with inferred writer forms and fidelity checks.
 - [Error Contract](./concepts/error-contract.md) — Structured failure categories, envelopes, hints, redaction, and process exit codes.
 - [Injected I/O and HTTP](./patterns/injected-io-and-http.md) — Build deterministic, safe filesystem and HTTP code from injected capabilities.
-- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, fields, comments, attachments, links, transitions, history, and client APIs.
-- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and safely update Jira issues and related activity.
+- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, project components and versions, fields, comments, links, transitions, history, and client APIs.
+- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and safely update Jira issues, components, fix versions, and related activity.
 - [Jira Wiki Conversion](./features/jira-wiki-conversion.md) — Bidirectional Jira wiki and Markdown conversion with explicit fidelity warnings.
 - [Loss-Aware Conversion](./patterns/loss-aware-conversion.md) — Convert rich-text dialects through mdast with deterministic normalization, passthrough, and explicit warnings.
 - [Markdown Document](./concepts/markdown-document.md) — Canonical mdast and Markdown representation, frontmatter, mentions, and loss-preserving dialect fences.
