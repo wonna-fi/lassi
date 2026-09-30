@@ -45,7 +45,7 @@ Before working with this feature, understand these concepts:
 ### Validation Rules
 
 - Direct issue keys must match the Jira key shape. Branch lookup selects the first capture from a configured pattern; without one, it selects the first default-project match, then the first issue-shaped match anywhere. It accepts a selected key only if its shape is valid and does not reject branches with multiple keys.
-- Project arguments are trimmed, uppercased, and validated as project keys; `.` works only for an issue key.
+- `jira component list/create` and `jira version list` trim, uppercase, and validate their project argument as a project key, and reject `.`, which stands only for an issue key. `jira issue create --project` and `jira issue createmeta PROJECT` pass the project through unchanged.
 - `jira issue get KEY --comments` and `--comments all` include all comments. A numeric value must be a positive whole number and selects the newest N; invalid values fail even alongside `--all`.
 - `--field` uses `alias=value`; configured aliases, standard fields, and raw custom-field IDs are accepted.
 - Create requires project, issue type, and summary after template and flag merging. The live create-metadata check rejects other required fields only when unset and without a server default; it exempts auto-filled `project`, `issuetype`, and `reporter`.
@@ -56,7 +56,7 @@ Before working with this feature, understand these concepts:
 - Transition names or IDs must select exactly one available transition; transition screen fields use that transition's metadata.
 - Comment deletion is limited to the current user's comments unless `--any` is supplied.
 - Link create and delete require two distinct issue keys and `--type`; deletion needs exactly one link matching the displayed relationship from the first issue.
-- Component add and fix-version set resolve names against project catalogs; component remove resolves names against components assigned to the issue. Each check precedes its respective write. Exact spelling wins over case-insensitive matching; ambiguous matches require exact spelling. See [Jira Domain](../concepts/jira-domain.md) for the resolution and request contracts.
+- Component add accepts names already assigned to the issue unchanged and resolves the others against the project catalog; fix-version set resolves every name against the project's versions; component remove resolves names against components assigned to the issue. Each check precedes its respective write. Exact spelling wins over case-insensitive matching; ambiguous matches require exact spelling. See [Jira Domain](../concepts/jira-domain.md) for the resolution and request contracts.
 - Component add rejects unknown names unless `--create` is set and rejects an archived project component when it is not already on the issue. Component remove requires every requested name to be on the issue; duplicate names resolve once.
 - Fix-version set accepts only non-archived project versions, released or not. Unknown names fail as `not_found`, archived names as `validation`; duplicate versions resolve once.
 - Numeric limits and attachment size values must be positive; issue search `--all` still stops at its hard cap.
@@ -81,8 +81,8 @@ Before working with this feature, understand these concepts:
 | Attachment exceeds the configured or command limit | Download skips it and reports the skip; accepted files retain collision-safe names. |
 | Batch export encounters existing or failed files | Per-issue results are retained and the batch error follows successful output. |
 | Digest JQL fragment contains unsafe clauses | It is rejected before combining with the built-in section queries. |
-| Adding components already on the issue | Return `no changes` when all names are already assigned; otherwise report them as unchanged alongside additions. |
-| Fix-version set receives the current set, or `--add` receives only current versions | Return `no changes` without an issue update. |
+| Adding components already on the issue | Return `no changes`, naming them, when all names are already assigned. Otherwise add the rest: the Markdown line names only the additions, while JSON and AXI list the already-assigned names under `unchanged`. |
+| Fix-version set receives the current set, or `--add` receives only current versions | Return `no changes` without an issue update. Names resolve before this comparison, so if one of those versions is archived the command fails with `validation` instead. |
 | Replacing fix versions would drop an archived version already on the issue | Warn that it cannot be assigned again; `--add` retains it. |
 | Component creation succeeds but a later create or issue update fails | Return the created components as partial success, then surface the error. Re-running can assign the now-existing components. |
 | A project lookup fails or component creation is forbidden | A missing project gets a project-key hint; a create 403 points to the Administer Projects permission. |

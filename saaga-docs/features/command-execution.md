@@ -106,7 +106,7 @@ Before working with this feature, understand these concepts:
 
 | Command surface | Purpose |
 |-----------|---------|
-| `lassi jira …` | Reads and mutates Jira issues, comments, attachments, links, transitions, project components and versions, and issue component and fix-version assignments; see [Jira Issue Workflows](./jira-issue-workflows.md). |
+| `lassi jira …` | Reads and mutates Jira issues, comments, attachments, links, and transitions; lists and creates project components, lists project versions, and changes an issue's components and fix versions; see [Jira Issue Workflows](./jira-issue-workflows.md). |
 | `lassi confluence …` | Reads and mutates Confluence pages, comments, and attachments. |
 | `lassi search …` | Builds, inspects, and queries the local semantic index. |
 | `lassi doctor` | Diagnoses configuration and connectivity. |
