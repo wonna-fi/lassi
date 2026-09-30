@@ -52,6 +52,8 @@ Configuration precedence and credential handling belong to [Runtime Context](./r
 | `JiraIssueLink` | `id`, `typeName`, `direction`, `description`, `otherKey`, optional `otherSummary`, optional `otherStatus` | Normalizes inward and outward links into one directed shape. |
 | `JiraTransition` | `id`, `name`, `to`, `fields` | Describes an available status transition and its screen fields. |
 | `JiraHistory` | `created`, `author`, `items` | Groups field changes made in one history event. |
+| `JiraChangeItem` | `field`, optional `fieldId` | Carries a history display name and, when Jira supplies it, the field's identity. |
+| `FlattenOptions` | `fields`, `aliases`, `fieldNames` | Supplies changelog filters, configured aliases, and an optional field ID to display-name map to `flattenChangelog()`. |
 | `JiraFieldMeta` | `fieldId`, `name`, `required`, `schema`, `allowedValues` | Drives validation and conversion of authored field values. |
 | `JiraComponent` | `id`, `name`, optional `description`, `lead`, `archived`, `project` | Represents a project component returned by Jira; an issue's `components` field holds named references. |
 | `JiraVersion` | `id`, `name`, `archived`, `released`, optional `description`, `releaseDate` | Represents a project version; an issue's `fixVersions` field holds named references. |
@@ -75,7 +77,9 @@ Comment IDs are decimal strings. The exported `assertCommentId()` validates them
 
 Field aliases are explicit configuration entries. Standard IDs and `customfield_N` may also be addressed directly, and frontmatter `type` maps to Jira's `issuetype`. Unknown names are returned separately instead of being sent to Jira.
 
-`matchesField()` compares changelog filters with a history item's display name, explicit field ID, or configured alias; filter names and display names are case-insensitive. For system history names covering components, fix versions, affected versions, and issue links, it also recognizes the corresponding system ID and edit-screen names when Jira omits `fieldId`. A present `fieldId` controls that system-field equivalence: a custom field named `Component` does not match `components`, although a direct filter for `Component` still matches its display name. Configured aliases resolve through an explicit `fieldId`, so they do not identify older items that lack one.
+`matchesField()` compares changelog filters with a history item's display name, explicit field ID, or configured alias; filter names and display names are case-insensitive. For system history names covering components, fix versions, affected versions, and issue links, it also recognizes the corresponding system ID and edit-screen names when Jira omits `fieldId`.
+
+An alias or raw `customfield_N` ID can match an item without `fieldId` through its display name when the caller supplies `FlattenOptions.fieldNames`, a field ID to instance display-name map. Without that map, a custom-field ID cannot be resolved for an ID-less item. Some system aliases still resolve through the known history names without a map. When `fieldId` is present, it controls alias and ID matching even if another field shares the display name: a custom field named `Component` does not match the `components` ID, although a direct filter for `Component` still matches that display name. An ID-less item carries no way to distinguish fields with the same display name; the command's lookup and warning behavior is in [Jira Issue Workflows](../features/jira-issue-workflows.md).
 
 API field objects become compact authored values where possible: users become usernames, options become values, named entities become names, and projects become keys. Objects that cannot be safely simplified remain mappings. In the reverse direction, the field schema shapes users, projects, options, arrays, components, versions, and other named values for Jira. The schema comes from loaded metadata, from the fetch that wrote a working file, or from the standard field table.
 
@@ -118,6 +122,9 @@ Transitions resolve case-insensitively by exact ID or name. No match is a valida
 | `JiraClient` | `listComponents()` / `createComponent()` / `listVersions()` | Read project catalogs and create a project component. |
 | `@wonna/lassi-jira` | `flattenChangelog()` | Produces ordered, filterable field-change rows. |
 | `@wonna/lassi-jira` | `matchesField()` | Tests one history item against a changelog field filter. |
+| `@wonna/lassi-jira` | `changelogFilterFieldId()` | Resolves a filter's configured alias or raw custom-field ID to a field ID. |
+| `@wonna/lassi-jira` | `changelogNeedsFieldNames()` | Reports whether custom-field filtering over ID-less history needs instance field names. |
+| `@wonna/lassi-jira` | `changelogFieldNames()` | Builds the caller-supplied ID-to-name map from Jira field definitions and reports missing or shared custom-field names. |
 | `@wonna/lassi-jira` | `buildDigest()` | Classifies fetched activity into digest sections and actions. |
 
 `JiraClient` is the public remote boundary. Its methods cover server identity, issue get/search/create/update, create/edit metadata, changelog, comment CRUD, attachment download/upload, transition list/apply, link types/list/create/delete, project component/version catalogs, component creation, and paginated export-oriented reads.
@@ -147,6 +154,7 @@ Transitions resolve case-insensitively by exact ID or name. No match is a valida
 - `packages/jira/src/client/named.ts` - exported case-insensitive name resolution with ambiguity handling.
 - `packages/jira/src/fields/normalize.ts` - bidirectional field-value normalization.
 - `packages/jira/src/issue/frontmatter.ts` - editable and readonly Jira frontmatter boundary.
+- `packages/jira/src/changelog/flatten.ts` - exported filter resolution, field-name mapping, and history flattening boundary.
 - `createJiraClient()` - reference entry point for Jira remote operations.
 - `resolveFieldAliases()` - reference for accepting aliases without guessing unknown fields.
 
