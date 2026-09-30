@@ -1,6 +1,12 @@
 import type { Command } from 'commander';
 import { LassiError, displayPath, parseSince, resolvePath } from '@wonna/lassi-core';
-import { flattenChangelog, wikiToMarkdown, type JiraIssue } from '@wonna/lassi-jira';
+import {
+  changelogFieldNames,
+  changelogNeedsFieldNames,
+  flattenChangelog,
+  wikiToMarkdown,
+  type JiraIssue,
+} from '@wonna/lassi-jira';
 import type { CliDeps } from '../../deps.js';
 import { truncate } from '../../output/axi.js';
 import { renderEntity } from '../../output/entity.js';
@@ -329,7 +335,8 @@ export function registerIssue(jira: Command, deps: CliDeps, session: Session): v
       const key = await resolveIssueKey(ctx, keyArg);
       const since = opts.since === undefined ? undefined : parseSince(opts.since, deps.now());
       const wanted = splitFields(opts.fields);
-      const log = await (await jiraClient(ctx)).changelog(key);
+      const client = await jiraClient(ctx);
+      const log = await client.changelog(key);
       if (log.truncated) {
         ctx.logger.warn(
           `Jira returned ${log.histories.length} of ${log.total} history entries for ${key}; the oldest are missing`
@@ -337,10 +344,19 @@ export function registerIssue(jira: Command, deps: CliDeps, session: Session): v
       }
       // An 8 KB description edit is one row here; every other reader cuts a long value.
       const cut = (value: string): string => truncate(value, CHANGELOG_VALUE_CHARS);
+      const aliases = aliasesOf(ctx);
+      // Items without a field id carry only a display name, so an alias or customfield_N filter
+      // needs the instance's field names; fetched only then.
+      const names =
+        wanted && changelogNeedsFieldNames(log.histories, wanted, aliases)
+          ? changelogFieldNames(await client.fields(), wanted, aliases)
+          : undefined;
+      for (const warning of names?.warnings ?? []) ctx.logger.warn(warning);
       const rows = flattenChangelog(log.histories, {
-        aliases: aliasesOf(ctx),
+        aliases,
         ...(since ? { since: since.instant } : {}),
         ...(wanted ? { fields: wanted } : {}),
+        ...(names ? { fieldNames: names.fieldNames } : {}),
       });
       const scope = [since ? `since ${since.text}` : '', wanted ? `for ${wanted.join(', ')}` : '']
         .filter((s) => s.length > 0)

@@ -1,6 +1,6 @@
 import { parseAtlassianDate, type Since } from '@wonna/lassi-core';
-import type { JiraChangeItem, JiraHistory } from '../client/types.js';
-import { aliasFor } from '../fields/aliases.js';
+import type { JiraChangeItem, JiraFieldDef, JiraHistory } from '../client/types.js';
+import { aliasFor, CUSTOM_FIELD_ID } from '../fields/aliases.js';
 
 export interface ChangeRow {
   /** Jira's timestamp verbatim, like every other date the CLI prints. */
@@ -19,6 +19,11 @@ export interface FlattenOptions {
   /** Aliases, display names or ids; case-insensitive. */
   fields?: string[];
   aliases?: Record<string, string>;
+  /**
+   * Field id → display name (`GET /field`), for items without `fieldId`: an alias or a
+   * `customfield_N` filter can then only match the item's display name.
+   */
+  fieldNames?: Record<string, string>;
 }
 
 /**
@@ -44,18 +49,88 @@ function matchesHistoryName(item: JiraChangeItem, field: string, w: string): boo
   return w === system.id.toLowerCase() || system.names.includes(w);
 }
 
+/** The field id a filter names through an alias or as `customfield_N`, both in any case. */
+export function changelogFilterFieldId(
+  wanted: string,
+  aliases: Record<string, string>
+): string | undefined {
+  const w = wanted.trim().toLowerCase();
+  const alias = Object.entries(aliases).find(([a]) => a.toLowerCase() === w);
+  if (alias !== undefined) return alias[1];
+  return CUSTOM_FIELD_ID.test(w) ? w : undefined;
+}
+
 export function matchesField(
   item: JiraChangeItem,
   wanted: string,
-  aliases: Record<string, string> = {}
+  aliases: Record<string, string> = {},
+  fieldNames: Record<string, string> = {}
 ): boolean {
   const w = wanted.trim().toLowerCase();
   const field = item.field.toLowerCase();
   if (w === field) return true;
   if (item.fieldId !== undefined && w === item.fieldId.toLowerCase()) return true;
   if (matchesHistoryName(item, field, w)) return true;
-  const alias = Object.entries(aliases).find(([a]) => a.toLowerCase() === w);
-  return alias !== undefined && alias[1] === item.fieldId;
+  const id = changelogFilterFieldId(wanted, aliases);
+  if (id === undefined) return false;
+  if (item.fieldId !== undefined) return item.fieldId === id;
+  // Without a fieldId the display name is all the item has, so the id is compared through it:
+  // the id itself for fields named by their id ("status"), the history name table, then the
+  // instance's name for the field. Own keys only, like HISTORY_NAMES.
+  if (id.toLowerCase() === field) return true;
+  if (Object.hasOwn(HISTORY_NAMES, field) && HISTORY_NAMES[field]?.id === id) return true;
+  const name = Object.hasOwn(fieldNames, id) ? fieldNames[id] : undefined;
+  return name !== undefined && name.toLowerCase() === field;
+}
+
+/**
+ * Whether filtering needs the instance's field names: some item came without `fieldId`, and some
+ * filter names a custom field through an alias or its id, which only its display name can match.
+ */
+export function changelogNeedsFieldNames(
+  histories: JiraHistory[],
+  wanted: string[],
+  aliases: Record<string, string>
+): boolean {
+  const custom = wanted.some((w) => {
+    const id = changelogFilterFieldId(w, aliases);
+    return id !== undefined && CUSTOM_FIELD_ID.test(id);
+  });
+  return custom && histories.some((h) => h.items.some((i) => i.fieldId === undefined));
+}
+
+/**
+ * Field id → display name for `flattenChangelog`, and a warning for each custom field a filter
+ * names that the instance lacks, or whose display name another field shares: without field ids,
+ * changes to every field of that name match.
+ */
+export function changelogFieldNames(
+  defs: JiraFieldDef[],
+  wanted: string[],
+  aliases: Record<string, string>
+): { fieldNames: Record<string, string>; warnings: string[] } {
+  // fromEntries defines own properties, so no id can reach the prototype.
+  const fieldNames: Record<string, string> = Object.fromEntries(defs.map((d) => [d.id, d.name]));
+  const warnings: string[] = [];
+  for (const w of wanted) {
+    const id = changelogFilterFieldId(w, aliases);
+    if (id === undefined || !CUSTOM_FIELD_ID.test(id)) continue;
+    const label = w.trim().toLowerCase() === id ? id : `${w.trim()} → ${id}`;
+    const name = Object.hasOwn(fieldNames, id) ? fieldNames[id] : undefined;
+    if (name === undefined) {
+      warnings.push(`${label} is not a field on this instance`);
+      continue;
+    }
+    const others = defs
+      .filter((d) => d.id !== id && d.name.toLowerCase() === name.toLowerCase())
+      .map((d) => d.id);
+    if (others.length > 0) {
+      warnings.push(
+        `${label} is called "${name}", like ${others.join(', ')}; changes without a field id match all of them`
+      );
+    }
+  }
+  return { fieldNames, warnings };
 }
 
 /** A wire object's own property, so a prototype member never answers for a missing field. */
@@ -66,6 +141,7 @@ function own(item: JiraChangeItem, key: 'toString' | 'fromString'): string | nul
 /** One row per changed field, oldest first; the wire object never leaves this function. */
 export function flattenChangelog(histories: JiraHistory[], opts: FlattenOptions = {}): ChangeRow[] {
   const aliases = opts.aliases ?? {};
+  const fieldNames = opts.fieldNames ?? {};
   const ordered = histories
     .map((h, index) => ({
       h,
@@ -84,7 +160,11 @@ export function flattenChangelog(histories: JiraHistory[], opts: FlattenOptions 
     const who = h.author?.name ?? h.author?.displayName ?? 'unknown';
     for (const item of h.items) {
       // `?.length`, not truthiness: an empty filter is no filter, and `[]` used to match nothing.
-      if (opts.fields?.length && !opts.fields.some((f) => matchesField(item, f, aliases))) continue;
+      if (
+        opts.fields?.length &&
+        !opts.fields.some((f) => matchesField(item, f, aliases, fieldNames))
+      )
+        continue;
       rows.push({
         at: h.created,
         who,
