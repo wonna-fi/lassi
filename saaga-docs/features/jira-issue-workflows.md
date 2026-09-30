@@ -68,6 +68,8 @@ Before working with this feature, understand these concepts:
 |----------|----------|
 | `.` is passed outside a matching branch | The command fails with guidance to supply a key or configure the branch pattern. |
 | Jira returns only part of the changelog or comments | Output records coverage and warns that older data is missing. |
+| A filtered custom field is absent from this Jira instance | When field names are needed, the command warns that the alias or ID is not a field on the instance. It still returns normal output, including `no changes` when nothing matches. |
+| Two fields have the same display name | When field names are needed, the command warns that ID-less changes with that name can match more than one field. It still returns normal output. |
 | Search has more results than requested | The command reports shown versus total; `--all` paginates to the cap. |
 | Working-file update changes no writable data | After any requested drift check, return `no changes` without fetching edit metadata, sending an update, or rewriting the file. |
 | A changed value is outside the cached allowed values | Fail with a validation error before fetching edit metadata or sending the update; the hint names when the values were cached and `jira issue editmeta KEY` to refresh them. |
@@ -105,7 +107,7 @@ The public Jira client and field conversion services used by these commands are 
 | `jira issue component add KEY NAME... [--create]` / `jira issue component remove KEY NAME...` | Assign existing or newly created components, or remove assignments while leaving project components intact. |
 | `jira issue fix-version set KEY VERSION... [--add]` | Replace fix versions, or add to the issue's current set. |
 | `jira issue create/update` | Create from flags/templates or update fields, body, or a working file. |
-| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID and finds component, version, and link changes even when Jira omits field IDs; see [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
+| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID, including ID-less custom-field changes through aliases and IDs when Jira supplies their names. See [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
 | `jira comment list/add/edit/delete` | Read and mutate issue comments. |
 | `jira attachment get/upload` | Download bounded attachments or upload local files. |
 | `jira transition list/do` | Inspect and execute available transitions with screen fields. |
@@ -118,6 +120,8 @@ Command registration starts at `registerJira()`, which attaches every group to t
 Create merges template defaults before explicit flags, resolves live metadata, maps aliases, validates required fields, converts the Markdown description to Jira wiki markup, then calls the client. Update follows the same coercion rules, but loads edit metadata only when a changed field needs it; a transition uses its screen's metadata instead.
 
 Issue retrieval requests expansion fields only when needed. A bare `--comments` or `--comments all` includes all comments; a positive integer selects the newest count. Attachments and links become generated read-only sections. `--out` writes the selected Markdown path and a per-path baseline under `.lassi/cache/jira/`, which later updates use to compute field and body changes.
+
+Changelog reads the issue history first. If `--fields` includes a custom-field alias or raw ID and any returned history item lacks `fieldId`, it then calls `JiraClient.fields()` (`GET /rest/api/2/field`) to supply the instance names before filtering. Filters that do not resolve to a custom-field ID, and histories where every item has `fieldId`, need no field-list request. The fetched names may produce the warnings in Edge Cases; warnings use the shared [Command Execution](./command-execution.md) rendering path and do not suppress the result.
 
 The command families use these product-specific paths:
 
