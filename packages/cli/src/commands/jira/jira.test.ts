@@ -703,6 +703,84 @@ describe('lassi jira issue changelog', () => {
     expect(t.stdout()).toContain('| jdoe | Component | - | Backend |');
   });
 
+  /** A Team change and a status change; `withIds: false` is a server that sends no fieldId. */
+  const teamHistory = (withIds: boolean): Route => ({
+    path: '/rest/api/2/issue/PROJ-123',
+    json: {
+      key: 'PROJ-123',
+      fields: { summary: 'S', status: { name: 'Open' } },
+      changelog: {
+        total: 1,
+        histories: [
+          {
+            id: '1',
+            created: '2026-09-02T09:00:00.000+0300',
+            author: { name: 'jdoe', displayName: 'J D' },
+            items: [
+              {
+                field: 'Owning Team',
+                fieldtype: 'custom',
+                ...(withIds ? { fieldId: 'customfield_10001' } : {}),
+                from: null,
+                fromString: null,
+                to: '1',
+                toString: 'Platform',
+              },
+              {
+                field: 'status',
+                fieldtype: 'jira',
+                ...(withIds ? { fieldId: 'status' } : {}),
+                from: '1',
+                fromString: 'Open',
+                to: '3',
+                toString: 'In Progress',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  });
+  const fieldList: Route = {
+    path: '/rest/api/2/field',
+    json: [
+      { id: 'customfield_10001', name: 'Owning Team', custom: true },
+      { id: 'status', name: 'Status', custom: false },
+    ],
+  };
+  const fieldListCalls = (t: ReturnType<typeof program>) =>
+    t.fetch.calls.filter((c) => c.url.pathname === '/rest/api/2/field').length;
+
+  it('finds an aliased or customfield_N field by its name when Jira sends no field ids', async () => {
+    for (const wanted of ['team', 'customfield_10001']) {
+      const t = program([teamHistory(false), fieldList]);
+      expect(await t.run(['jira', 'issue', 'changelog', 'PROJ-123', '--fields', wanted])).toBe(0);
+      expect(t.stdout()).toContain('| jdoe | Owning Team | - | Platform |');
+      expect(t.stdout()).not.toContain('In Progress');
+      expect(fieldListCalls(t)).toBe(1);
+    }
+    // A server that sends field ids, or a filter by a name, needs no field list.
+    const withIds = program([teamHistory(true), fieldList]);
+    expect(await withIds.run(['jira', 'issue', 'changelog', 'PROJ-123', '--fields', 'team'])).toBe(
+      0
+    );
+    expect(withIds.stdout()).toContain('| jdoe | team | - | Platform |');
+    expect(fieldListCalls(withIds)).toBe(0);
+    const byStatus = program([teamHistory(false), fieldList]);
+    expect(
+      await byStatus.run(['jira', 'issue', 'changelog', 'PROJ-123', '--fields', 'status'])
+    ).toBe(0);
+    expect(byStatus.stdout()).toContain('| jdoe | status | Open | In Progress |');
+    expect(fieldListCalls(byStatus)).toBe(0);
+  });
+
+  it('warns when a filter names a custom field this instance does not have', async () => {
+    const t = program([teamHistory(false), fieldList]);
+    expect(await t.run(['jira', 'issue', 'changelog', 'PROJ-123', '--fields', 'ghost'])).toBe(0);
+    expect(t.stderr()).toContain('ghost → customfield_10009 is not a field on this instance');
+    expect(t.stdout()).toContain('no changes for ghost on PROJ-123');
+  });
+
   it('cuts a long changed value for the table and the agent payload, never for --json', async () => {
     const long = 'x'.repeat(400);
     const t = makeTestProgram({

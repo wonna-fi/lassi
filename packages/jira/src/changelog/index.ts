@@ -1,4 +1,7 @@
 export {
+  changelogFieldNames,
+  changelogFilterFieldId,
+  changelogNeedsFieldNames,
   flattenChangelog,
   matchesField,
   sinceToJql,

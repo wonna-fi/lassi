@@ -1,7 +1,13 @@
 import { parseSince } from '@wonna/lassi-core';
 import { describe, expect, it } from 'vitest';
 import type { JiraHistory } from '../client/types.js';
-import { flattenChangelog, matchesField, sinceToJql } from './flatten.js';
+import {
+  changelogFieldNames,
+  changelogNeedsFieldNames,
+  flattenChangelog,
+  matchesField,
+  sinceToJql,
+} from './flatten.js';
 
 const HISTORIES: JiraHistory[] = [
   {
@@ -189,6 +195,85 @@ describe('matchesField', () => {
     expect(matchesField(named('Component', 'customfield_123'), 'components')).toBe(false);
     expect(matchesField(named('Component', 'customfield_123'), 'Component/s')).toBe(false);
     expect(matchesField(named('Component', 'customfield_123'), 'Component')).toBe(true);
+  });
+});
+
+describe('matchesField without field ids', () => {
+  const team = { field: 'Owning Team', from: null, fromString: null, to: null, toString: null };
+  const NAMES = { customfield_10001: 'Owning Team', customfield_10002: 'Squad' };
+
+  it('matches an alias or a customfield id through the field name when the item has no fieldId', () => {
+    for (const wanted of ['team', 'TEAM', 'customfield_10001', 'CustomField_10001']) {
+      expect(matchesField(team, wanted, ALIASES, NAMES)).toBe(true);
+    }
+    expect(matchesField(team, 'customfield_10002', ALIASES, NAMES)).toBe(false);
+    // Without the instance's names there is nothing to compare, as before.
+    expect(matchesField(team, 'team', ALIASES)).toBe(false);
+    expect(matchesField(team, 'customfield_10001')).toBe(false);
+  });
+
+  it('lets a fieldId decide over a matching name', () => {
+    const other = { ...team, fieldId: 'customfield_10002' };
+    expect(matchesField(other, 'team', ALIASES, NAMES)).toBe(false);
+    expect(matchesField(other, 'customfield_10002', ALIASES, NAMES)).toBe(true);
+  });
+
+  it('resolves an alias to a system field through its history name', () => {
+    const status = { field: 'status', from: null, fromString: null, to: null, toString: null };
+    const component = { ...status, field: 'Component' };
+    const aliases = { st: 'status', comp: 'components' };
+    expect(matchesField(status, 'st', aliases)).toBe(true);
+    expect(matchesField(component, 'comp', aliases)).toBe(true);
+  });
+
+  it('never reads a field name from the prototype', () => {
+    const odd = { ...team, field: 'function Object() { [native code] }' };
+    expect(matchesField(odd, 'constructor', { constructor: 'constructor' }, {})).toBe(false);
+  });
+});
+
+describe('changelogNeedsFieldNames', () => {
+  const withIds: JiraHistory[] = HISTORIES;
+  const withoutIds: JiraHistory[] = [
+    {
+      id: '3',
+      created: '2026-09-04T09:00:00.000+0300',
+      items: [{ field: 'Owning Team', from: null, fromString: null, to: null, toString: 'Web' }],
+    },
+  ];
+
+  it('asks for names only for a custom-field filter and items without fieldId', () => {
+    expect(changelogNeedsFieldNames(withoutIds, ['team'], ALIASES)).toBe(true);
+    expect(changelogNeedsFieldNames(withoutIds, ['customfield_10001'], {})).toBe(true);
+    expect(changelogNeedsFieldNames(withoutIds, ['status', 'Owning Team'], ALIASES)).toBe(false);
+    expect(changelogNeedsFieldNames(withIds, ['team'], ALIASES)).toBe(false);
+  });
+
+  it('matches through the names once they are fetched', () => {
+    const { fieldNames, warnings } = changelogFieldNames(
+      [{ id: 'customfield_10001', name: 'Owning Team', custom: true }],
+      ['team'],
+      ALIASES
+    );
+    expect(warnings).toEqual([]);
+    expect(
+      flattenChangelog(withoutIds, { aliases: ALIASES, fields: ['team'], fieldNames })
+    ).toHaveLength(1);
+  });
+});
+
+describe('changelogFieldNames', () => {
+  it('warns about a filter field the instance lacks and about a shared display name', () => {
+    const defs = [
+      { id: 'customfield_10001', name: 'Owning Team', custom: true },
+      { id: 'customfield_10003', name: 'owning team', custom: true },
+    ];
+    expect(
+      changelogFieldNames(defs, ['team', 'customfield_10009', 'status'], ALIASES).warnings
+    ).toEqual([
+      'team → customfield_10001 is called "Owning Team", like customfield_10003; changes without a field id match all of them',
+      'customfield_10009 is not a field on this instance',
+    ]);
   });
 });
 
