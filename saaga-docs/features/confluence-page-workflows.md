@@ -1,6 +1,7 @@
 ---
 title: "Feature: Confluence Page Workflows"
 type: feature
+last_verified: 2026-10-03
 sources:
   - packages/cli/src/commands/shared/{storage,export-manifest}.ts
   - packages/confluence/package.json
@@ -30,12 +31,12 @@ Before working with this feature, understand these concepts:
 ### User Flow
 
 1. Identify a page by numeric ID, `SPACE:Title`, supported URL, or search it with CQL; `tree` explores its hierarchy.
-2. Run `page get` to print canonical Markdown or save a working file. Optional comments and attachment metadata become generated sections.
+2. Run `confluence page get` to print canonical Markdown or save a working file. Optional comments and attachment metadata become generated sections.
 3. Edit only the page body, title, or parent in a writable Markdown working file; storage output has no cache and view output is read-only.
 4. Follow the shared validation and refresh sequence in [Working File Lifecycle](./working-file-lifecycle.md); Confluence additionally requires an unchanged numeric page version.
 5. With valid cached storage, conversion reuses its users and editor shapes. A changed body must pass the fidelity check unless `--force` is given. Without that storage, the command warns, skips the check, and treats a supplied body as changed.
 6. A successful update increments the Confluence version; `--keep` suppresses the normal working-file refresh.
-7. Use comment commands for footer discussion, attachment download for files, and macro statistics to see unsupported content and prevalent editor forms.
+7. Use `confluence page comment list/add` for footer discussion, `confluence page attach get <PAGE_ID>` for files, and macro statistics to see unsupported content and prevalent editor forms. Delete a comment by its own ID with `confluence comment delete <COMMENT_ID>`; the own-comment and `--any` rules still apply.
 
 Archive export searches a space or CQL and writes `<ID>.md` snapshots for offline use and search indexing. Its conflict-safe manifest lifecycle is documented in [Working File Lifecycle](./working-file-lifecycle.md).
 
@@ -85,8 +86,9 @@ The client, editable fields, and statistics interfaces are described in [Conflue
 | `confluence page create` / `validate` / `update` | Creates pages, asks the server to parse generated storage, or applies safe edits. |
 | `confluence page export [CQL]` | Archives pages selected by CQL or space with manifest conflict protection. |
 | `confluence search <CQL>` / `tree <ref>` | Finds content or walks a page hierarchy. |
-| `confluence comment list`, `add`, `delete` | Reads and mutates footer comments. |
-| `confluence attach get <PAGE_ID>` | Downloads selected attachments outside the context window. |
+| `confluence page comment list/add` | Lists or adds footer comments on a page. |
+| `confluence comment delete <COMMENT_ID>` | Deletes a comment addressed by its own ID. |
+| `confluence page attach get <PAGE_ID>` | Downloads selected attachments outside the context window. |
 | `confluence stats macros` | Reports macro use, raw-fence reasons, and observed writer conventions. |
 
 ## Integration Points

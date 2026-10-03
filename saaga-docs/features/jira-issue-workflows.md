@@ -1,7 +1,7 @@
 ---
 title: "Feature: Jira Issue Workflows"
 type: feature
-last_verified: 2026-09-30
+last_verified: 2026-10-03
 sources:
   - packages/jira/package.json
   - packages/cli/src/commands/shared/{storage,export-manifest}.ts
@@ -38,14 +38,14 @@ Before working with this feature, understand these concepts:
 2. Identify an issue by key, or pass `.` to derive a key from the current branch.
 3. Inspect the issue, search with JQL, or query create/edit metadata before authoring fields.
 4. For local editing, run `jira issue get KEY --out file.md`, edit writable frontmatter and Markdown, then run `jira issue update KEY --file file.md --if-unchanged`. The flag enables a server-drift check; omitting it skips that check. See [Working File Lifecycle](./working-file-lifecycle.md) for caching and refresh behavior.
-5. Use the sibling commands for comments, attachments, transitions, bulk export, or a personal activity digest. To remove a link, inspect `jira link list KEY1`, then run `jira link delete KEY1 KEY2 --type PHRASE` with the relationship as displayed from KEY1.
-6. To assign project components, inspect `jira component list PROJECT`, then run `jira issue component add KEY NAME...` or `jira issue component remove KEY NAME...`. Add `--create` to make missing project components before assigning them; `jira component create PROJECT NAME --description TEXT` creates one independently.
-7. To choose fix versions, inspect `jira version list PROJECT`, then run `jira issue fix-version set KEY VERSION...`. This replaces the issue's fix versions; `--add` retains its current ones.
+5. Use `jira issue comment`, `jira issue attach`, and `jira issue transition` for comments, attachments, and transitions; use `jira issue export` for bulk export or `jira digest` for a personal activity digest. To remove a link, inspect `jira issue link list KEY1`, then run `jira issue link delete KEY1 KEY2 --type PHRASE` with the relationship as displayed from KEY1. `jira issue link create KEY1 KEY2 --type PHRASE` adds one; `jira link types` lists the instance's direction phrases.
+6. To assign project components, inspect `jira project component list PROJECT`, then run `jira issue component add KEY NAME...` or `jira issue component remove KEY NAME...`. Add `--create` to make missing project components before assigning them; `jira project component create PROJECT NAME --description TEXT` creates one independently.
+7. To choose fix versions, inspect `jira project version list PROJECT`, then run `jira issue fix-version set KEY VERSION...`. This replaces the issue's fix versions; `--add` retains its current ones.
 
 ### Validation Rules
 
 - Direct issue keys must match the Jira key shape. Branch lookup selects the first capture from a configured pattern; without one, it selects the first default-project match, then the first issue-shaped match anywhere. It accepts a selected key only if its shape is valid and does not reject branches with multiple keys.
-- `jira component list/create` and `jira version list` trim, uppercase, and validate their project argument as a project key, and reject `.`, which stands only for an issue key. `jira issue create --project` and `jira issue createmeta PROJECT` pass the project through unchanged.
+- `jira project component list/create` and `jira project version list` trim, uppercase, and validate their project argument as a project key, and reject `.`, which stands only for an issue key. `jira issue create --project` and `jira issue createmeta PROJECT` pass the project through unchanged.
 - `jira issue get KEY --comments` and `--comments all` include all comments. A numeric value must be a positive whole number and selects the newest N; invalid values fail even alongside `--all`.
 - `--field` uses `alias=value`; configured aliases, standard fields, and raw custom-field IDs are accepted.
 - Create requires project, issue type, and summary after template and flag merging. The live create-metadata check rejects other required fields only when unset and without a server default; it exempts auto-filled `project`, `issuetype`, and `reporter`.
@@ -102,16 +102,17 @@ The public Jira client and field conversion services used by these commands are 
 | Command | Purpose |
 |-----------|---------|
 | `jira issue get/search/export` | Read one issue, query Jira, or save issue working files in bulk. |
-| `jira component list PROJECT` / `jira component create PROJECT NAME [--description TEXT]` | List project components or create a named component with an optional description. |
-| `jira version list PROJECT` | List non-archived versions available as fix versions, including released versions. |
+| `jira project component list PROJECT` / `jira project component create PROJECT NAME [--description TEXT]` | List project components or create a named component with an optional description. |
+| `jira project version list PROJECT` | List non-archived versions available as fix versions, including released versions. |
 | `jira issue component add KEY NAME... [--create]` / `jira issue component remove KEY NAME...` | Assign existing or newly created components, or remove assignments while leaving project components intact. |
 | `jira issue fix-version set KEY VERSION... [--add]` | Replace fix versions, or add to the issue's current set. |
 | `jira issue create/update` | Create from flags/templates or update fields, body, or a working file. |
 | `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID, including ID-less custom-field changes through aliases and IDs when Jira supplies their names. See [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
-| `jira comment list/add/edit/delete` | Read and mutate issue comments. |
-| `jira attachment get/upload` | Download bounded attachments or upload local files. |
-| `jira transition list/do` | Inspect and execute available transitions with screen fields. |
-| `jira link types/list/create/delete` | Inspect link semantics, create a directed issue link, or remove one displayed relationship. |
+| `jira issue comment list/add/edit/delete` | Read and mutate issue comments. |
+| `jira issue attach get/upload` | Download bounded attachments or upload local files. |
+| `jira issue transition list/do` | Inspect and execute available transitions with screen fields. |
+| `jira issue link list/create/delete` | Inspect issue links, create a directed link, or remove one displayed relationship. |
+| `jira link types` | Inspect instance-level link types and their directional phrases. |
 | `jira fields` and `jira templates` | Inspect configured aliases and reusable creation templates. |
 | `jira digest` | Summarize assigned, mentioned, and recently changed work. |
 

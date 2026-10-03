@@ -1,7 +1,7 @@
 ---
 title: "Feature: Command Execution"
 type: feature
-last_verified: 2026-09-30
+last_verified: 2026-10-03
 sources:
   - packages/cli/src/cli.ts
   - packages/cli/src/commands/{jira,confluence}/*.ts
@@ -106,15 +106,17 @@ Before working with this feature, understand these concepts:
 
 | Command surface | Purpose |
 |-----------|---------|
-| `lassi jira …` | Reads and mutates Jira issues, comments, attachments, links, and transitions; lists and creates project components, lists project versions, and changes an issue's components and fix versions; see [Jira Issue Workflows](./jira-issue-workflows.md). |
-| `lassi confluence …` | Reads and mutates Confluence pages, comments, and attachments. |
+| `lassi jira issue …` / `lassi jira project …` | Issue operations include comments, attachments, transitions, links, components, and fix versions; project operations manage component and version catalogs. Instance-level `lassi jira link types` remains outside those groups; see [Jira Issue Workflows](./jira-issue-workflows.md). |
+| `lassi jira fields`, `lassi jira templates`, `lassi jira digest` | Inspect configured field aliases and creation templates, or summarize personal activity. |
+| `lassi confluence page …` | Page operations include footer comments and attachments. `lassi confluence comment delete` remains outside the page group because it addresses a comment by ID; see [Confluence Page Workflows](./confluence-page-workflows.md). |
+| `lassi confluence search`, `lassi confluence tree`, `lassi confluence stats macros` | Search content, walk a page or space hierarchy, or report macro use and conversion statistics. |
 | `lassi search …` | Builds, inspects, and queries the local semantic index. |
 | `lassi doctor` | Diagnoses configuration and connectivity. |
 | `lassi config show` | Displays effective configuration and provenance with secrets masked. |
 | `lassi skills install` | Plans or installs agent-facing skill assets. |
 | `lassi help` | Renders the complete command reference. |
 
-Global flags are `--json`, `--axi`, `--dry-run`, `--config <path>`, `--quiet`, and `--verbose`; `-V`/`--version` prints version and Git SHA. `lassi help --all` nests `jira issue component` and `jira issue fix-version` under the `jira issue` heading.
+Global flags are `--json`, `--axi`, `--dry-run`, `--config <path>`, `--quiet`, and `--verbose`; `-V`/`--version` prints version and Git SHA. `lassi help --all` shows `jira issue` and `jira project` groups, with issue components and fix versions under the former and project catalogs under the latter; it also shows the `confluence page` group.
 Output defaults to Markdown, while `--json` favors complete machine data and `--axi` favors compact agent data with advisory command-aware suggestions.
 
 Markdown output is command-authored and may include a newline-normalized GFM table, frontmatter-backed entity text, or a trailer. JSON serialization uses standard `JSON.stringify` semantics and is the escape hatch for full text that AXI intentionally abbreviates. AXI converts values through JSON semantics, wraps arrays and scalars in a root object, and can derive command-aware next steps when the handler does not supply its own help.
