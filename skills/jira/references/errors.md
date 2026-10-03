@@ -24,7 +24,7 @@ Every failure prints one human line and one JSON line on stderr; stdout stays em
 | Missing required field on create | `lassi jira issue createmeta <P> --type <T>` and the aliases of the missing ids |
 | Unknown field on update | `lassi jira issue editmeta <KEY>` |
 | Invalid option value | the allowed values from metadata |
-| Transition failed on screen fields | `lassi jira transition list <KEY>` |
+| Transition failed on screen fields | `lassi jira issue transition list <KEY>` |
 | 401 | the token file path and `lassi doctor` |
 | TLS | `NODE_EXTRA_CA_CERTS` (and `NODE_USE_ENV_PROXY=1` behind a proxy) |
 | Read-only block | the name of the environment variable |

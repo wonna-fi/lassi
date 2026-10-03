@@ -26,8 +26,8 @@ interface GetOptions {
   maxSize?: string;
 }
 
-export function registerAttach(jira: Command, deps: CliDeps, session: Session): void {
-  const att = group(jira, 'attach', 'attachments (files on disk, never in the context window)');
+export function registerAttach(issue: Command, deps: CliDeps, session: Session): void {
+  const att = group(issue, 'attach', 'attachments (files on disk, never in the context window)');
   const get = att
     .command('get <KEY>')
     .description('download attachments as <ID>-<filename>; preserve existing local content')

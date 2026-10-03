@@ -22,7 +22,7 @@ Each line names an issue key; `--json` gives the full model. `--since` takes `2h
 lassi jira issue get PROJ-123                 # frontmatter + description; the trailer says what is hidden
 lassi jira issue get PROJ-123 --comments 5    # newest five comments
 lassi jira issue get PROJ-123 --all           # comments, attachments, links
-lassi jira link list PROJ-123                 # blockers and dependencies with direction
+lassi jira issue link list PROJ-123                 # blockers and dependencies with direction
 lassi jira issue changelog PROJ-123 --since 7d   # who changed which field, when (oldest first)
 ```
 
@@ -31,8 +31,8 @@ Use `--json` when you need the raw field values (custom field ids, dates as stri
 ## Comment
 
 ```sh
-lassi jira comment add PROJ-123 --body "Reproduced on 2.3.1; the validator assumes a non-empty password." --dry-run
-lassi jira comment add PROJ-123 --body "Reproduced on 2.3.1; the validator assumes a non-empty password."
+lassi jira issue comment add PROJ-123 --body "Reproduced on 2.3.1; the validator assumes a non-empty password." --dry-run
+lassi jira issue comment add PROJ-123 --body "Reproduced on 2.3.1; the validator assumes a non-empty password."
 ```
 
 For anything with structure write a file and pass `--file note.md` (or pipe markdown on stdin).
@@ -77,9 +77,9 @@ type, project, summary, fields and the description; every flag and `--field` you
 ## Transition
 
 ```sh
-lassi jira transition list PROJ-123                 # ids, names, target status, screen fields (* = required)
-lassi jira transition do PROJ-123 "In Review" --dry-run
-lassi jira transition do PROJ-123 Done --field resolution=Fixed --comment "Fixed in 2.3.1"
+lassi jira issue transition list PROJ-123                 # ids, names, target status, screen fields (* = required)
+lassi jira issue transition do PROJ-123 "In Review" --dry-run
+lassi jira issue transition do PROJ-123 Done --field resolution=Fixed --comment "Fixed in 2.3.1"
 ```
 
 Names are matched case-insensitively; an id works too. A required screen field that is missing
@@ -88,10 +88,10 @@ exits 5 and the hint names `transition list`.
 ## Attachments
 
 ```sh
-lassi jira attach get PROJ-123                      # all files to .lassi/PROJ-123/ (size cap from config)
-lassi jira attach get PROJ-123 --only "*.log" --out ./tmp/PROJ-123
-lassi jira attach upload PROJ-123 ./analysis.md ./trace.har --dry-run
-lassi jira attach upload PROJ-123 ./analysis.md ./trace.har
+lassi jira issue attach get PROJ-123                      # all files to .lassi/PROJ-123/ (size cap from config)
+lassi jira issue attach get PROJ-123 --only "*.log" --out ./tmp/PROJ-123
+lassi jira issue attach upload PROJ-123 ./analysis.md ./trace.har --dry-run
+lassi jira issue attach upload PROJ-123 ./analysis.md ./trace.har
 ```
 
 Then read the returned paths with your own tools. Filenames include attachment IDs so duplicate names stay distinct. Identical repeat downloads report `unchanged`; different existing content is preserved with exit 6. Inspect every row on partial failure: successful files remain available, and failed rows include structured errors. Uploads stop at the first failure and report how
@@ -101,9 +101,9 @@ many landed; files above `attachments.maxSizeMb` are refused before anything is 
 
 ```sh
 lassi jira link types                               # names with inward/outward phrases
-lassi jira link create PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # prints the resolved sentence
-lassi jira link create PROJ-1 PROJ-2 --type "is blocked by"
-lassi jira link delete PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # the link `link list PROJ-1` shows that way
+lassi jira issue link create PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # prints the resolved sentence
+lassi jira issue link create PROJ-1 PROJ-2 --type "is blocked by"
+lassi jira issue link delete PROJ-1 PROJ-2 --type "is blocked by" --dry-run   # the link `link list PROJ-1` shows that way
 ```
 
 Either the outward or the inward phrase is accepted; the CLI flips the direction and prints the
@@ -113,11 +113,11 @@ no link, the error lists the links that do exist between the two issues.
 ## Components and fix versions
 
 ```sh
-lassi jira component list PROJ                                   # the project's components
+lassi jira project component list PROJ                                   # the project's components
 lassi jira issue component add PROJ-123 Backend "Data import" --dry-run
 lassi jira issue component add PROJ-123 Mobile --create          # creates Mobile in PROJ first
 lassi jira issue component remove PROJ-123 Backend
-lassi jira version list PROJ                                     # versions an issue can take
+lassi jira project version list PROJ                                     # versions an issue can take
 lassi jira issue fix-version set PROJ-123 2.1                    # replaces the fix versions
 lassi jira issue fix-version set PROJ-123 2.2 --add              # keeps the ones it has
 ```

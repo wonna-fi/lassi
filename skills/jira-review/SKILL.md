@@ -33,7 +33,7 @@ If the Jira skill or required tools are unavailable, use provided evidence and r
    constraints apply to this issue's actor, state and release. A child can deliver one slice of
    an Epic; it need not repeat inherited definitions or deliver sibling work. Distinguish a
    confirmed empty Epic Link from an omitted field or failed fetch.
-4. Download issue images through `lassi jira attach get PROJ-123 --json` or its documented selection
+4. Download issue images through `lassi jira issue attach get PROJ-123 --json` or its documented selection
    options. Use the returned attachment ID-to-path map, including duplicate filenames. Inspect
    the actual images with an image-capable tool. Metadata, filenames, alt text and OCR alone do
    not establish visual contents. Include images embedded in comments. Inspect relevant Epic

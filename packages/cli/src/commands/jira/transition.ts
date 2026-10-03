@@ -31,8 +31,8 @@ function screenFields(t: JiraTransition, aliases: Record<string, string>): strin
     .join(', ');
 }
 
-export function registerTransition(jira: Command, deps: CliDeps, session: Session): void {
-  const transition = group(jira, 'transition', 'workflow transitions');
+export function registerTransition(issue: Command, deps: CliDeps, session: Session): void {
+  const transition = group(issue, 'transition', 'workflow transitions');
 
   const list = transition
     .command('list <KEY>')
@@ -94,7 +94,7 @@ export function registerTransition(jira: Command, deps: CliDeps, session: Sessio
           fieldIdFor(aliases, name) ?? (Object.hasOwn(chosen.fields, name) ? name : undefined);
         if (id === undefined) {
           throw new LassiError('usage', `unknown field "${name}" for transition ${chosen.name}`, {
-            hint: `run \`lassi jira transition list ${key}\` to see the screen fields`,
+            hint: `run \`lassi jira issue transition list ${key}\` to see the screen fields`,
             context,
           });
         }

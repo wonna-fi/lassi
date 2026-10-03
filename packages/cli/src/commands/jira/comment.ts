@@ -14,8 +14,8 @@ import { group, jiraClient } from './shared.js';
 const BODY_HELP = ['--body <md>', 'comment body as markdown'] as const;
 const FILE_HELP = ['--file <path>', 'markdown file with the body ("-" reads stdin)'] as const;
 
-export function registerComment(jira: Command, deps: CliDeps, session: Session): void {
-  const comment = group(jira, 'comment', 'issue comments');
+export function registerComment(issue: Command, deps: CliDeps, session: Session): void {
+  const comment = group(issue, 'comment', 'issue comments');
 
   const list = comment
     .command('list <KEY>')

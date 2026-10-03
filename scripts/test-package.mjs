@@ -90,7 +90,25 @@ function cli(args, overrides = {}, status = 0) {
   return result.stdout;
 }
 assert.ok(cli(['--version']).startsWith(`lassi ${manifest.version} (`));
-assert.match(cli(['help', '--all']), /lassi jira issue get/);
+const commandReference = cli(['help', '--all']);
+for (const command of [
+  'jira issue get',
+  'jira issue comment add',
+  'jira issue attach get',
+  'jira issue transition do',
+  'jira issue link create',
+  'jira project component create',
+  'jira project version list',
+  'jira link types',
+  'confluence page comment add',
+  'confluence page attach get',
+  'confluence comment delete',
+])
+  assert.ok(commandReference.includes(`lassi ${command}`));
+const beforeLegacy = readFileSync(requestLog, 'utf8');
+cli(['jira', 'attach', 'get', 'PROJ-1'], {}, 2);
+cli(['confluence', 'comment', 'add', '123', '--body', 'example'], {}, 2);
+assert.equal(readFileSync(requestLog, 'utf8'), beforeLegacy);
 assert.ok(readFileSync(join(installed, 'README.md'), 'utf8').includes('not production-ready'));
 
 // Configuration, exports and indexes share the documented home-directory defaults.
@@ -117,7 +135,7 @@ assert.ok(!config.includes('fixture-jira-token') && !config.includes('fixture-em
 const issue = JSON.parse(cli(['jira', 'issue', 'get', 'PROJ-1', '--all', '--json']));
 assert.equal(issue.commentCoverage.complete, true);
 assert.match(issue.body, /Retry a failed deployment/);
-const attachments = JSON.parse(cli(['jira', 'attach', 'get', 'PROJ-1', '--json']));
+const attachments = JSON.parse(cli(['jira', 'issue', 'attach', 'get', 'PROJ-1', '--json']));
 assert.equal(attachments.saved, 1);
 assert.equal(readFileSync(join(working, attachments.files[0].path), 'utf8'), 'demo');
 cli(['jira', 'issue', 'export', 'project = PROJ', '--comments']);
@@ -145,7 +163,11 @@ cli(['search', 'index'], {}, 6);
 assert.equal(countEmbeddings(), beforeIncremental, 'A storage lock must block embedding requests');
 
 const beforeWrite = readFileSync(requestLog, 'utf8');
-cli(['jira', 'comment', 'add', 'PROJ-1', '--body', 'blocked'], { LASSI_READ_ONLY: '1' }, 7);
+cli(
+  ['jira', 'issue', 'comment', 'add', 'PROJ-1', '--body', 'blocked'],
+  { LASSI_READ_ONLY: '1' },
+  7
+);
 assert.equal(
   readFileSync(requestLog, 'utf8'),
   beforeWrite,
@@ -154,10 +176,19 @@ assert.equal(
 cli(['skills', 'install', '--only', 'jira']);
 const skillDir = join(home, '.agents/skills/jira');
 assert.match(readFileSync(join(skillDir, 'SKILL.md'), 'utf8'), /lassi jira/);
-assert.match(
-  readFileSync(join(skillDir, 'references/commands.md'), 'utf8'),
-  /lassi jira issue get/
+const skillCommands = readFileSync(join(skillDir, 'references/commands.md'), 'utf8');
+assert.match(skillCommands, /lassi jira issue comment add/);
+assert.match(skillCommands, /lassi jira project component create/);
+assert.match(skillCommands, /lassi jira link types/);
+assert.ok(!skillCommands.includes('lassi jira comment'));
+cli(['skills', 'install', '--only', 'confluence']);
+const confluenceCommands = readFileSync(
+  join(home, '.agents/skills/confluence/references/commands.md'),
+  'utf8'
 );
+assert.match(confluenceCommands, /lassi confluence page comment add/);
+assert.match(confluenceCommands, /lassi confluence page attach get/);
+assert.match(confluenceCommands, /lassi confluence comment delete/);
 const skill = join(skillDir, 'SKILL.md');
 writeFileSync(skill, readFileSync(skill, 'utf8') + '\nLocal customization.\n');
 cli(['skills', 'install', '--only', 'jira'], {}, 5);
