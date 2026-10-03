@@ -1,6 +1,7 @@
 ---
 title: "Feature: Confluence Storage Conversion"
 type: feature
+last_verified: 2026-10-03
 sources:
   - packages/cli/src/commands/confluence/{page,comment,stats}.ts
   - packages/confluence/src/stats/macros.ts
@@ -119,7 +120,7 @@ Write warnings cover dropped code metadata, image titles, or TOC parameters, con
 |-----------|---------|
 | `confluence page get … --format md` | Reads storage with user resolution, warnings, and canonical Markdown output. |
 | `confluence page get … --format view` | Converts rendered HTML for read-only inspection. |
-| `confluence page create` / `comment add` | Converts authored Markdown using default writer forms after validation. |
+| `confluence page create` / `confluence page comment add` | Converts authored Markdown using default writer forms after validation. |
 | `confluence page update --file …` | Reuses cached users and inferred forms, then applies the fidelity gate. |
 | `confluence page validate` | Sends generated storage only to Confluence's storage-to-view parser. |
 | `confluence stats macros` | Aggregates macros, raw-fence reasons, and observed page shapes. |
