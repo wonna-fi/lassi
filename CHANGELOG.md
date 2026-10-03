@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-alpha.7
 
 ### Breaking changes
 
@@ -10,5 +10,8 @@
   `lassi confluence page`. Comment deletion remains `lassi confluence comment delete <COMMENT_ID>`.
 
 The previous paths for moved commands are no longer accepted. Arguments and options retain
-their meanings. Refresh the bundled agent skills after upgrading, or use `lassi help --all`
-for the current command reference.
+their meanings. After upgrading, run `lassi skills install` to refresh the bundled agent skills.
+Reuse the original target and selection options, including `--project <dir>` for project-local
+skills; without `--project`, the installer targets the global `~/.agents/skills/` directory.
+If the installer reports conflicts, back up and review customized skills before using `--force`,
+which overwrites those files. Use `lassi help --all` for the current command reference.
