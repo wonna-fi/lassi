@@ -116,6 +116,40 @@ function program(files: Record<string, string> = WORKSPACE) {
 }
 
 describe('--axi', () => {
+  it.each([
+    {
+      command: 'jira issue get PROJ-123',
+      suggestions: ['jira issue comment add', 'jira issue transition list'],
+    },
+    {
+      command: 'jira issue comment add PROJ-123 --body hello',
+      suggestions: ['jira issue comment list'],
+    },
+    { command: 'jira link types', suggestions: ['jira issue link create'] },
+    { command: 'jira project component list PROJ', suggestions: ['jira issue component add'] },
+    { command: 'jira project version list PROJ', suggestions: ['jira issue fix-version set'] },
+    { command: 'confluence page comment list 123', suggestions: ['confluence page comment add'] },
+  ])('$command suggests command paths that resolve', async ({ command, suggestions }) => {
+    const t = makeTestProgram({
+      env: BOTH_PRODUCTS_ENV,
+      routes: [
+        ...ROUTES,
+        { path: '/rest/api/2/issueLinkType', json: { issueLinkTypes: [] } },
+        { path: '/rest/api/2/project/PROJ/components', json: [] },
+        { path: '/rest/api/2/project/PROJ/versions', json: [] },
+        { path: '/rest/api/content/123/child/comment', json: { results: [], size: 0 } },
+      ],
+    });
+    expect(await t.run([...command.split(' '), '--axi'])).toBe(0);
+    for (const path of suggestions) {
+      expect(t.stdout()).toContain(`\`lassi ${path} `);
+      const help = makeTestProgram();
+      expect(await help.run(['help', ...path.split(' ')])).toBe(0);
+      expect(help.stdout()).toContain(`Usage: lassi ${path}`);
+      expect(help.fetch.calls).toHaveLength(0);
+    }
+  });
+
   it('is mutually exclusive with --json and appears once in help --all', async () => {
     const t = program();
     expect(await t.run(['--json', '--axi', 'config', 'show'])).toBe(2);
@@ -171,7 +205,7 @@ describe('--axi', () => {
     expect(out).toContain('description: "## Steps\\n\\n1. one\\n2. two\\n"');
     expect(out).toContain('hidden: 3\n');
     expect(out).toContain(
-      'help[3]:\n  Run `lassi jira comment add PROJ-123 --body "..."` to comment.\n'
+      'help[3]:\n  Run `lassi jira issue comment add PROJ-123 --body "..."` to comment.\n'
     );
     expect(out).toContain(
       'Add --comments, --attachments or --links (or --all) to see the 3 hidden items.'
@@ -201,7 +235,7 @@ describe('--axi', () => {
 
   it('cuts comment bodies at 200 characters in lists and says so', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'list', 'PROJ-123', '--axi'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'comment', 'list', 'PROJ-123', '--axi'])).toBe(0);
     const out = t.stdout();
     expect(out).toContain(
       'key: PROJ-123\ntotal: 1\nshown: 1\nincomplete: false\ncomplete: true\ncomments[1]{id,author,created,body}:\n'
@@ -217,7 +251,17 @@ describe('--axi', () => {
   it('renders a dry run as data (no block), sends nothing, and leaves errors on stderr unchanged', async () => {
     const dry = program();
     expect(
-      await dry.run(['jira', 'comment', 'add', 'PROJ-123', '--body', 'x', '--dry-run', '--axi'])
+      await dry.run([
+        'jira',
+        'issue',
+        'comment',
+        'add',
+        'PROJ-123',
+        '--body',
+        'x',
+        '--dry-run',
+        '--axi',
+      ])
     ).toBe(0);
     expect(dry.stdout()).not.toContain('DRY RUN');
     expect(dry.stdout()).toContain(
@@ -227,9 +271,13 @@ describe('--axi', () => {
     expect(dry.fetch.calls.filter((c) => c.method !== 'GET')).toHaveLength(0);
 
     const axi = program();
-    expect(await axi.run(['jira', 'comment', 'add', 'PROJ-400', '--body', 'x', '--axi'])).toBe(5);
+    expect(
+      await axi.run(['jira', 'issue', 'comment', 'add', 'PROJ-400', '--body', 'x', '--axi'])
+    ).toBe(5);
     const json = program();
-    expect(await json.run(['jira', 'comment', 'add', 'PROJ-400', '--body', 'x', '--json'])).toBe(5);
+    expect(
+      await json.run(['jira', 'issue', 'comment', 'add', 'PROJ-400', '--body', 'x', '--json'])
+    ).toBe(5);
     expect(axi.stderr()).toBe(json.stderr());
     expect(axi.stdout()).toBe('');
     expect(lastJsonLine(axi.stderr())).toMatchObject({ code: 'validation', http: 400 });

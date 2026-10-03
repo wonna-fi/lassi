@@ -27,7 +27,7 @@ describe('resolveVersions', () => {
       expect.objectContaining({
         code: 'not_found',
         message: 'no version "3.0" in PROJ; allowed: 2.0, 2.1',
-        hint: 'run `lassi jira version list PROJ`',
+        hint: 'run `lassi jira project version list PROJ`',
       })
     );
   });

@@ -80,7 +80,7 @@ const RULES: Rule[] = [
     if (e.code !== 'validation' || e.context.product !== 'jira') return undefined;
     const { project, issueType, issueKey, transition, operation } = e.context;
     if (transition && issueKey) {
-      return `Run \`lassi jira transition list ${issueKey}\` to see the required screen fields.${allowedValuesNote(e)}`;
+      return `Run \`lassi jira issue transition list ${issueKey}\` to see the required screen fields.${allowedValuesNote(e)}`;
     }
     if ((operation === 'create' || issueKey === undefined) && project) {
       const type = issueType ? ` --type ${issueType}` : '';

@@ -44,28 +44,28 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
         return [
           `Edit the file, then run \`lassi jira issue update ${key} --file ${input.opts['out'] as string} --if-unchanged\`.`,
         ];
-      const out = [`Run \`lassi jira comment add ${key} --body "..."\` to comment.`];
+      const out = [`Run \`lassi jira issue comment add ${key} --body "..."\` to comment.`];
       const hidden = num(data['hidden']);
       if (hidden !== undefined && hidden > 0)
         out.push(
           `Add --comments, --attachments or --links (or --all) to see the ${hidden} hidden item${hidden === 1 ? '' : 's'}.`
         );
-      out.push(`Run \`lassi jira transition list ${key}\` before changing the status.`);
+      out.push(`Run \`lassi jira issue transition list ${key}\` before changing the status.`);
       return out;
     }
     case 'jira issue create':
       return [`Run \`lassi jira issue get ${str(data['key'], '<KEY>')}\` to verify the new issue.`];
     case 'jira issue update':
-    case 'jira transition do':
+    case 'jira issue transition do':
     case 'jira issue component add':
     case 'jira issue component remove':
     case 'jira issue fix-version set':
       return [`Run \`lassi jira issue get ${str(data['key'], arg(0, '<KEY>'))}\` to verify.`];
-    case 'jira component list':
+    case 'jira project component list':
       return [
         'Run `lassi jira issue component add <KEY> "<name>" --dry-run` (--create for a new component).',
       ];
-    case 'jira version list':
+    case 'jira project version list':
       return [
         'Run `lassi jira issue fix-version set <KEY> "<version>" --dry-run` (--add to keep the others).',
       ];
@@ -90,10 +90,12 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
         out.push('Jira returned a partial changelog; the oldest entries are missing.');
       return out;
     }
-    case 'jira comment list': {
+    case 'jira issue comment list': {
       const key = str(data['key'], arg(0, '<KEY>'));
       if ((num(data['total']) ?? 0) === 0)
-        return [`No comments yet; run \`lassi jira comment add ${key} --body "..."\` to add one.`];
+        return [
+          `No comments yet; run \`lassi jira issue comment add ${key} --body "..."\` to add one.`,
+        ];
       return ['Bodies are cut at 200 characters; use --json for the full text.'];
     }
     case 'jira digest': {
@@ -126,22 +128,26 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
         'Run `lassi jira templates <NAME>` for the description skeleton, then `lassi jira issue create --template <NAME> --summary "..." --file <md> --dry-run`.',
       ];
     }
-    case 'jira comment add':
-    case 'jira comment edit':
-      return [`Run \`lassi jira comment list ${str(data['key'], arg(0, '<KEY>'))}\` to verify.`];
-    case 'jira transition list': {
+    case 'jira issue comment add':
+    case 'jira issue comment edit':
+      return [
+        `Run \`lassi jira issue comment list ${str(data['key'], arg(0, '<KEY>'))}\` to verify.`,
+      ];
+    case 'jira issue transition list': {
       const key = str(data['key'], arg(0, '<KEY>'));
       if ((num(data['count']) ?? 0) === 0)
         return ['No transitions are available from the current status.'];
       return [
-        `Run \`lassi jira transition do ${key} <name>\` (add --field for required screen fields).`,
+        `Run \`lassi jira issue transition do ${key} <name>\` (add --field for required screen fields).`,
       ];
     }
-    case 'jira attach get':
-    case 'confluence attach get':
+    case 'jira issue attach get':
+    case 'confluence page attach get':
       return ['Read the saved files with your own tools; nothing binary is printed.'];
     case 'jira link types':
-      return ['Run `lassi jira link create <KEY1> <KEY2> --type "<name or phrase>" --dry-run`.'];
+      return [
+        'Run `lassi jira issue link create <KEY1> <KEY2> --type "<name or phrase>" --dry-run`.',
+      ];
     case 'doctor': {
       const summary = record(data['summary']);
       const failing = (data['checks'] as Array<Record<string, unknown>> | undefined)
@@ -192,16 +198,16 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
       ];
     case 'confluence page update':
       return [`Run \`lassi confluence page get ${str(data['id'], arg(0, '<ID>'))}\` to verify.`];
-    case 'confluence comment list': {
+    case 'confluence page comment list': {
       const id = arg(0, '<ID>');
       if ((num(data['total']) ?? 0) === 0)
         return [
-          `No comments yet; run \`lassi confluence comment add ${id} --body "..."\` to add one.`,
+          `No comments yet; run \`lassi confluence page comment add ${id} --body "..."\` to add one.`,
         ];
       return ['Bodies are cut at 200 characters; use --json for the full text.'];
     }
-    case 'confluence comment add':
-      return [`Run \`lassi confluence comment list ${arg(0, '<ID>')}\` to verify.`];
+    case 'confluence page comment add':
+      return [`Run \`lassi confluence page comment list ${arg(0, '<ID>')}\` to verify.`];
     case 'confluence stats macros':
       return ['Constructs in the raw-fence table are what the dialect cannot carry yet.'];
     case 'jira issue export':

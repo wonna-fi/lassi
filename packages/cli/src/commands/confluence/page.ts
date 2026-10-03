@@ -5,7 +5,7 @@ import { renderEntity } from '../../output/entity.js';
 import { attach, type Session } from '../../run-command.js';
 import { registerPageExport } from './export.js';
 import { registerPageWrites } from './page-write.js';
-import { confluenceClient, group, resolvePage } from './shared.js';
+import { confluenceClient, resolvePage } from './shared.js';
 import { buildPageDocument, savePageWorkingFile, type PageDocument } from './workfile.js';
 
 /** The `--axi` view of a page: identity, read-only facts and counts flat, then the body. */
@@ -43,9 +43,7 @@ interface GetOptions {
   attachments?: boolean;
 }
 
-export function registerPage(confluence: Command, deps: CliDeps, session: Session): Command {
-  const page = group(confluence, 'page', 'read, create, update and validate pages');
-
+export function registerPage(page: Command, deps: CliDeps, session: Session): Command {
   const get = page
     .command('get <ID|"SPACE:Title">')
     .description(

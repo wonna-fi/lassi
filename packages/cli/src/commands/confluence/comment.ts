@@ -9,8 +9,8 @@ import { attach, type Session } from '../../run-command.js';
 import { markdownBodyToStorage } from './body.js';
 import { confluenceClient, converterFor, group } from './shared.js';
 
-export function registerComment(confluence: Command, deps: CliDeps, session: Session): Command {
-  const comment = group(confluence, 'comment', 'footer comments');
+export function registerPageComments(page: Command, deps: CliDeps, session: Session): Command {
+  const comment = group(page, 'comment', 'footer comments on a page');
   const list = comment
     .command('list <PAGE_ID>')
     .description('footer comments as markdown (author, date, id, body)');
@@ -90,6 +90,15 @@ export function registerComment(confluence: Command, deps: CliDeps, session: Ses
     },
   });
 
+  return comment;
+}
+
+export function registerCommentDelete(
+  confluence: Command,
+  deps: CliDeps,
+  session: Session
+): Command {
+  const comment = group(confluence, 'comment', 'comments addressed by their own id');
   const del = comment
     .command('delete <COMMENT_ID>')
     .description('delete one of your own comments (--any for other authors)')

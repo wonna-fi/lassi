@@ -19,7 +19,7 @@ line plus one JSON line on stderr with a stable `code` and a `hint`.
    `page update`; it lets the server parse the converted storage without saving anything.
 3. **On a non-zero exit**, read the JSON on stderr, follow `hint`, retry **once**, then stop and ask
    the human.
-4. **Attachments are files.** `lassi confluence attach get <ID>` downloads them to disk; read them with
+4. **Attachments are files.** `lassi confluence page attach get <ID>` downloads them to disk; read them with
    your own tools.
 5. **Prefer the working-file flow** (`page get --out` → edit → `page validate` → `page update --file`)
    for anything longer than a one-line comment.
@@ -39,8 +39,8 @@ line plus one JSON line on stderr with a stable `code` and a `hint`.
 | Work a page | `lassi confluence page get 123456 --out work/page.md`, edit, `lassi confluence page validate --file work/page.md`, `lassi confluence page update --file work/page.md` |
 | Create | `lassi confluence page create --space DEV --title "Runbook" --parent 123400 --file runbook.md` |
 | Rename / move | `lassi confluence page update 123456 --title "New title" --parent 100` |
-| Comment | `lassi confluence comment list 123456`; `lassi confluence comment add 123456 --body "Reviewed."` |
-| Attachments | `lassi confluence attach get 123456 --only "*.png"` |
+| Comment | `lassi confluence page comment list 123456`; `lassi confluence page comment add 123456 --body "Reviewed."` |
+| Attachments | `lassi confluence page attach get 123456 --only "*.png"` |
 | What a space uses | `lassi confluence stats macros --space DEV` |
 
 Every write accepts `--dry-run`. `LASSI_READ_ONLY=1` blocks all writes (exit 7).

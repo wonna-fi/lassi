@@ -17,7 +17,7 @@ Start with the description and counts. Request `--comments 5` for recent context
 
 ```sh
 lassi jira issue get PROJ-123 --comments all --attachments --links --axi
-lassi jira attach get PROJ-123 --only '*.log' --json
+lassi jira issue attach get PROJ-123 --only '*.log' --json
 ```
 
 Use the returned attachment ID-to-path mapping. Files are named with stable attachment IDs, so two equal filenames can coexist. Read logs, PDFs and images with the agent's own tools. Check `saved`, `unchanged`, `skipped`, `failed` and `complete`; a size skip or partial failure means some evidence was not read. A failed batch can still return successful paths on stdout. Retry failed selections once according to stderr's structured error; preserve local files reported as conflicts.

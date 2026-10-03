@@ -20,9 +20,9 @@ import { group, jiraClient, withProjectHints } from './shared.js';
 
 const joined = (names: string[]): string => names.join(', ');
 
-/** `jira component …`: the components of a project. */
-export function registerComponent(jira: Command, deps: CliDeps, session: Session): void {
-  const component = group(jira, 'component', 'project components');
+/** `jira project component …`: the components of a project. */
+export function registerComponent(project: Command, deps: CliDeps, session: Session): void {
+  const component = group(project, 'component', 'project components');
 
   const list = component.command('list <PROJECT>').description('components of a project');
   attach<[string], Record<string, never>>(list, deps, session, {

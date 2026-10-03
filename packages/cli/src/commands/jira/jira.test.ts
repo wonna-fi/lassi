@@ -342,7 +342,7 @@ describe('lassi jira fields / comment list / link / attach', () => {
 
   it('comment list --limit fetches the newest and notes the total', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'list', 'PROJ-123', '--limit', '1'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'comment', 'list', 'PROJ-123', '--limit', '1'])).toBe(0);
     expect(t.fetch.calls[0]?.url.search).toBe('?startAt=0&maxResults=1&orderBy=-created');
     expect(t.stdout()).toContain('### jsmith · 2026-09-07 · id 7\n\ncomment 7\n');
     expect(t.stdout().trim().endsWith('(1 of 7 comments shown)')).toBe(true);
@@ -356,10 +356,10 @@ describe('lassi jira fields / comment list / link / attach', () => {
     await md.run(['jira', 'link', 'types', '--md']);
     expect(md.stdout().startsWith('# Jira link types')).toBe(true);
     const list = program();
-    await list.run(['jira', 'link', 'list', 'PROJ-123']);
+    await list.run(['jira', 'issue', 'link', 'list', 'PROJ-123']);
     expect(list.stdout()).toContain('| PROJ-123 blocks PROJ-2 | PROJ-2 | Other | Open |');
     const json = program();
-    await json.run(['jira', 'link', 'list', 'PROJ-123', '--json']);
+    await json.run(['jira', 'issue', 'link', 'list', 'PROJ-123', '--json']);
     expect(JSON.parse(json.stdout())).toMatchObject({
       key: 'PROJ-123',
       links: [{ otherKey: 'PROJ-2' }],
@@ -370,7 +370,7 @@ describe('lassi jira fields / comment list / link / attach', () => {
     const dir = await mkdtemp(join(tmpdir(), 'lassi-attach-'));
     tmpDirs.push(dir);
     const t = program();
-    expect(await t.run(['jira', 'attach', 'get', 'PROJ-123', '--out', dir])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'attach', 'get', 'PROJ-123', '--out', dir])).toBe(0);
     expect(await readFile(join(dir, '1-stack.png'))).toEqual(Buffer.from([1, 2, 3]));
     expect(t.stdout()).toContain('| stack.png |');
     expect(t.stdout()).toContain('| 3 | image/png | saved |');
@@ -381,6 +381,7 @@ describe('lassi jira fields / comment list / link / attach', () => {
     const only = program();
     await only.run([
       'jira',
+      'issue',
       'attach',
       'get',
       'PROJ-123',
@@ -437,7 +438,7 @@ describe('"." as the issue key', () => {
       '/home/u/proj/.git': 'gitdir: /home/u/main/.git/worktrees/proj\n',
       '/home/u/main/.git/worktrees/proj/HEAD': 'ref: refs/heads/release/v2-1/DEV-7-and-PROJ-123\n',
     });
-    expect(await t.run(['jira', 'link', 'list', '.'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'link', 'list', '.'])).toBe(0);
     expect(t.fetch.calls[0]?.url.pathname).toBe('/rest/api/2/issue/PROJ-123');
   });
 
@@ -492,13 +493,13 @@ describe('"." as the issue key', () => {
     });
 
     const detached = onBranch({ [HEAD]: `${'a'.repeat(40)}\n` });
-    expect(await detached.run(['jira', 'comment', 'list', '.'])).toBe(2);
+    expect(await detached.run(['jira', 'issue', 'comment', 'list', '.'])).toBe(2);
     expect(lastJsonLine(detached.stderr())).toMatchObject({
       message: expect.stringContaining('detached'),
     });
 
     const main = onBranch({ [HEAD]: 'ref: refs/heads/main\n' });
-    expect(await main.run(['jira', 'attach', 'get', '.'])).toBe(2);
+    expect(await main.run(['jira', 'issue', 'attach', 'get', '.'])).toBe(2);
     expect(lastJsonLine(main.stderr())).toMatchObject({
       message: 'branch "main" contains no issue key',
       hint: expect.stringContaining('jira.branchPattern'),
@@ -524,7 +525,7 @@ describe('next steps after `.`', () => {
     });
     expect(await t.run(['jira', 'issue', 'get', '.', '--axi'])).toBe(0);
     // A stored next step must not depend on which branch it was generated on.
-    expect(t.stdout()).toContain('lassi jira comment add PROJ-123');
+    expect(t.stdout()).toContain('lassi jira issue comment add PROJ-123');
     expect(t.stdout()).not.toContain('comment add .');
   });
 });

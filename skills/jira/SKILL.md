@@ -21,7 +21,7 @@ misconfigured.
    itself. Run `lassi jira issue editmeta <KEY>` only to see them; Jira can take minutes to answer.
 3. **On a non-zero exit**, read the JSON on stderr, follow `hint`, retry **once**, then stop and ask
    the human. Never loop on the same error.
-4. **Attachments are files.** `lassi jira attach get <KEY>` downloads them to disk; read them with your
+4. **Attachments are files.** `lassi jira issue attach get <KEY>` downloads them to disk; read them with your
    own tools. Nothing binary ever comes through stdout.
 5. **Prefer the working-file flow** (`issue get --out` → edit → `issue update --file --if-unchanged`)
    for anything longer than a one-line comment.
@@ -42,14 +42,14 @@ Use a known key directly, JQL for field constraints, semantic search for meaning
 | Search | `lassi jira issue search 'project = PROJ AND status = "In Progress"' --limit 20` |
 | Related work | `lassi search show --axi`; `lassi search query "describe the symptom" --product jira --axi` |
 | What changed | `lassi jira issue changelog PROJ-123 --since 1d` (`--fields status,assignee`; `--since` takes `2h`, `1w`, `2026-09-01`) |
-| Comment | `lassi jira comment add PROJ-123 --body "One line."` or `--file note.md` |
+| Comment | `lassi jira issue comment add PROJ-123 --body "One line."` or `--file note.md` |
 | Work a ticket | `lassi jira issue get PROJ-123 --out work/PROJ-123.md`, edit, then `lassi jira issue update PROJ-123 --file work/PROJ-123.md --if-unchanged` |
 | Create | `lassi jira templates bug --out desc.md` (skeleton), fill it in, then `lassi jira issue create --template bug --summary "Login 500" --file desc.md`; without templates use `--project PROJ --type Bug`, inspect `issue createmeta`, and supply the required fields |
-| Transition | `lassi jira transition list PROJ-123`, then `lassi jira transition do PROJ-123 "In Review" --field resolution=Fixed` |
-| Attachments | `lassi jira attach get PROJ-123 --only "*.png"`; `lassi jira attach upload PROJ-123 ./log.txt` |
-| Links | `lassi jira link types`; `lassi jira link list PROJ-123`; `lassi jira link create PROJ-1 PROJ-2 --type "blocks"`; `lassi jira link delete PROJ-1 PROJ-2 --type "blocks"` |
-| Components | `lassi jira component list PROJ`; `lassi jira issue component add PROJ-123 Backend` (`--create` makes a missing one); `lassi jira issue component remove PROJ-123 Backend` |
-| Fix versions | `lassi jira version list PROJ`, then `lassi jira issue fix-version set PROJ-123 2.1` (replaces; `--add` keeps the others) |
+| Transition | `lassi jira issue transition list PROJ-123`, then `lassi jira issue transition do PROJ-123 "In Review" --field resolution=Fixed` |
+| Attachments | `lassi jira issue attach get PROJ-123 --only "*.png"`; `lassi jira issue attach upload PROJ-123 ./log.txt` |
+| Links | `lassi jira link types`; `lassi jira issue link list PROJ-123`; `lassi jira issue link create PROJ-1 PROJ-2 --type "blocks"`; `lassi jira issue link delete PROJ-1 PROJ-2 --type "blocks"` |
+| Components | `lassi jira project component list PROJ`; `lassi jira issue component add PROJ-123 Backend` (`--create` makes a missing one); `lassi jira issue component remove PROJ-123 Backend` |
+| Fix versions | `lassi jira project version list PROJ`, then `lassi jira issue fix-version set PROJ-123 2.1` (replaces; `--add` keeps the others) |
 | Field metadata | `lassi jira fields`; `lassi jira issue createmeta PROJ --type Bug`; `lassi jira issue editmeta PROJ-123` |
 
 Every write accepts `--dry-run`. `LASSI_READ_ONLY=1` in the environment blocks all writes (exit 7).

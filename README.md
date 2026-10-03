@@ -83,7 +83,7 @@ Replace `PROJ-123` with an issue you can access:
 
 ```sh
 lassi jira issue get PROJ-123 --all --json
-lassi jira attach get PROJ-123 --json
+lassi jira issue attach get PROJ-123 --json
 ```
 
 For semantic search, export a set of issues and index the resulting Markdown. Replace the

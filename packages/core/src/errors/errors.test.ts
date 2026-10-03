@@ -280,7 +280,7 @@ describe('pickHint', () => {
       context: { product: 'jira', issueKey: 'PROJ-1', transition: true },
     });
     expect(pickHint(err)).toBe(
-      'Run `lassi jira transition list PROJ-1` to see the required screen fields.'
+      'Run `lassi jira issue transition list PROJ-1` to see the required screen fields.'
     );
   });
 

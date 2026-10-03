@@ -98,11 +98,11 @@ function program(routes: Route[], env: Record<string, string> = {}) {
 
 const writes = (t: ReturnType<typeof program>) => t.fetch.calls.filter((c) => c.method !== 'GET');
 
-describe('lassi jira component list', () => {
+describe('lassi jira project component list', () => {
   it('lists the project components, archived ones marked', async () => {
     const jira = componentJira();
     const t = program(jira.routes);
-    expect(await t.run(['jira', 'component', 'list', 'proj'])).toBe(0);
+    expect(await t.run(['jira', 'project', 'component', 'list', 'proj'])).toBe(0);
     expect(t.stdout()).toBe(
       [
         '# PROJ components',
@@ -121,11 +121,11 @@ describe('lassi jira component list', () => {
     const jira = componentJira();
     for (const bad of ['.', 'PROJ-1', 'a/b']) {
       const t = program(jira.routes);
-      expect(await t.run(['jira', 'component', 'list', bad])).toBe(2);
+      expect(await t.run(['jira', 'project', 'component', 'list', bad])).toBe(2);
       expect(t.fetch.calls).toHaveLength(0);
     }
     const missing = program(jira.routes);
-    expect(await missing.run(['jira', 'component', 'list', 'NOPE'])).toBe(4);
+    expect(await missing.run(['jira', 'project', 'component', 'list', 'NOPE'])).toBe(4);
     expect(lastJsonLine(missing.stderr())).toMatchObject({
       code: 'not_found',
       hint: 'check the project key NOPE (the part of an issue key before the dash)',
@@ -133,13 +133,14 @@ describe('lassi jira component list', () => {
   });
 });
 
-describe('lassi jira component create', () => {
+describe('lassi jira project component create', () => {
   it('creates a component, and previews the request first under --dry-run', async () => {
     const jira = componentJira();
     const dry = program(jira.routes);
     expect(
       await dry.run([
         'jira',
+        'project',
         'component',
         'create',
         'PROJ',
@@ -155,14 +156,16 @@ describe('lassi jira component create', () => {
     expect(writes(dry)).toHaveLength(0);
 
     const t = program(jira.routes);
-    expect(await t.run(['jira', 'component', 'create', 'PROJ', 'Mobile', '--json'])).toBe(0);
+    expect(
+      await t.run(['jira', 'project', 'component', 'create', 'PROJ', 'Mobile', '--json'])
+    ).toBe(0);
     expect(JSON.parse(t.stdout())).toMatchObject({ id: '20', name: 'Mobile' });
     expect(jira.inProject()).toContain('Mobile');
   });
 
   it('refuses a name the project already has, in any case', async () => {
     const t = program(componentJira().routes);
-    expect(await t.run(['jira', 'component', 'create', 'PROJ', 'backend'])).toBe(5);
+    expect(await t.run(['jira', 'project', 'component', 'create', 'PROJ', 'backend'])).toBe(5);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'validation',
       message: 'component "Backend" already exists in PROJ (id 10)',
@@ -182,10 +185,10 @@ describe('lassi jira component create', () => {
       },
       ...jira.routes,
     ]);
-    expect(await t.run(['jira', 'component', 'create', 'PROJ', 'Mobile'])).not.toBe(0);
+    expect(await t.run(['jira', 'project', 'component', 'create', 'PROJ', 'Mobile'])).not.toBe(0);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'auth',
-      hint: 'creating a component needs the Administer Projects permission in PROJ; ask a project admin, or use an existing component (`lassi jira component list PROJ`)',
+      hint: 'creating a component needs the Administer Projects permission in PROJ; ask a project admin, or use an existing component (`lassi jira project component list PROJ`)',
     });
   });
 });
@@ -226,7 +229,7 @@ describe('lassi jira issue component add', () => {
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'not_found',
       message: 'no component "Mobile" in PROJ; components: Backend, Frontend',
-      hint: 'pass --create to create it, or run `lassi jira component list PROJ`',
+      hint: 'pass --create to create it, or run `lassi jira project component list PROJ`',
     });
     expect(writes(t)).toHaveLength(0);
     expect(jira.onIssue()).toEqual(['Frontend']);

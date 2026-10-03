@@ -57,10 +57,10 @@ function program(routes: Route[], env: Record<string, string> = {}) {
 
 const writes = (t: ReturnType<typeof program>) => t.fetch.calls.filter((c) => c.method !== 'GET');
 
-describe('lassi jira version list', () => {
+describe('lassi jira project version list', () => {
   it('lists the versions an issue can take, leaving out archived ones', async () => {
     const t = program(versionJira().routes);
-    expect(await t.run(['jira', 'version', 'list', 'PROJ'])).toBe(0);
+    expect(await t.run(['jira', 'project', 'version', 'list', 'PROJ'])).toBe(0);
     expect(t.stdout()).toBe(
       [
         '# PROJ fix versions',
@@ -74,7 +74,7 @@ describe('lassi jira version list', () => {
       ].join('\n')
     );
     const axi = program(versionJira().routes);
-    expect(await axi.run(['jira', 'version', 'list', 'PROJ', '--axi'])).toBe(0);
+    expect(await axi.run(['jira', 'project', 'version', 'list', 'PROJ', '--axi'])).toBe(0);
     expect(axi.stdout()).toContain('lassi jira issue fix-version set <KEY>');
   });
 });
@@ -119,7 +119,7 @@ describe('lassi jira issue fix-version set', () => {
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'not_found',
       message: 'no version "9.9" in PROJ; allowed: 2.0, 2.1, 3.0',
-      hint: 'run `lassi jira version list PROJ`',
+      hint: 'run `lassi jira project version list PROJ`',
     });
     expect(writes(t)).toHaveLength(0);
   });

@@ -184,10 +184,12 @@ const APPENDIX_B_MD =
 const APPENDIX_B_WIKI =
   'h3. Root cause\n\nThe password field is _optional_ in the DTO but the validator assumes it is present.\n\n{code:ts}\nconst pw = dto.password.trim();\n{code}\n';
 
-describe('lassi jira comment add|edit|delete', () => {
+describe('lassi jira issue comment add|edit|delete', () => {
   it('converts the body to wiki markup, posts it and prints the id', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', APPENDIX_B_MD])).toBe(0);
+    expect(
+      await t.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', APPENDIX_B_MD])
+    ).toBe(0);
     expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({ body: APPENDIX_B_WIKI });
     expect(t.stdout()).toBe('comment 3 added to PROJ-123\n');
   });
@@ -195,7 +197,16 @@ describe('lassi jira comment add|edit|delete', () => {
   it('--dry-run prints the Appendix B block and sends no write', async () => {
     const t = program();
     expect(
-      await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', APPENDIX_B_MD, '--dry-run'])
+      await t.run([
+        'jira',
+        'issue',
+        'comment',
+        'add',
+        'PROJ-123',
+        '--body',
+        APPENDIX_B_MD,
+        '--dry-run',
+      ])
     ).toBe(0);
     expect(t.stdout()).toBe(
       `DRY RUN — nothing sent\nPOST /rest/api/2/issue/PROJ-123/comment\n--- body (wiki markup) ---\n${APPENDIX_B_WIKI}`
@@ -206,7 +217,17 @@ describe('lassi jira comment add|edit|delete', () => {
   it('--dry-run --json prints one document with the preview', async () => {
     const t = program();
     expect(
-      await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', '# hi', '--dry-run', '--json'])
+      await t.run([
+        'jira',
+        'issue',
+        'comment',
+        'add',
+        'PROJ-123',
+        '--body',
+        '# hi',
+        '--dry-run',
+        '--json',
+      ])
     ).toBe(0);
     expect(JSON.parse(t.stdout())).toEqual({
       dryRun: true,
@@ -220,20 +241,22 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('exits 7 under LASSI_READ_ONLY before any request', async () => {
     const t = program({ env: { LASSI_READ_ONLY: '1' } });
-    expect(await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', '# hi'])).toBe(7);
+    expect(await t.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', '# hi'])).toBe(7);
     expect(t.fetch.calls).toHaveLength(0);
     expect(lastJsonLine(t.stderr())).toMatchObject({ code: 'read_only' });
   });
 
   it('reads the body from --file or piped stdin', async () => {
     const fromFile = program({ files: { '/home/u/proj/note.md': '# from file\n' } });
-    expect(await fromFile.run(['jira', 'comment', 'add', 'PROJ-123', '--file', 'note.md'])).toBe(0);
+    expect(
+      await fromFile.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--file', 'note.md'])
+    ).toBe(0);
     expect(JSON.parse(writes(fromFile)[0]?.bodyText ?? '')).toEqual({ body: 'h1. from file\n' });
     const fromStdin = program({ stdin: '# from stdin\n' });
-    expect(await fromStdin.run(['jira', 'comment', 'add', 'PROJ-123'])).toBe(0);
+    expect(await fromStdin.run(['jira', 'issue', 'comment', 'add', 'PROJ-123'])).toBe(0);
     expect(JSON.parse(writes(fromStdin)[0]?.bodyText ?? '')).toEqual({ body: 'h1. from stdin\n' });
     const nothing = program();
-    expect(await nothing.run(['jira', 'comment', 'add', 'PROJ-123'])).toBe(2);
+    expect(await nothing.run(['jira', 'issue', 'comment', 'add', 'PROJ-123'])).toBe(2);
     expect(lastJsonLine(nothing.stderr())).toMatchObject({
       code: 'usage',
       message: expect.stringContaining('--body'),
@@ -242,7 +265,9 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('refuses pasted wiki markup with exit 2 and the fence hint', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', 'h1. Title\n'])).toBe(2);
+    expect(
+      await t.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', 'h1. Title\n'])
+    ).toBe(2);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'usage',
       message: expect.stringContaining('looks like Jira wiki markup'),
@@ -253,10 +278,14 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('validates mentions before sending and writes them as [~user]', async () => {
     const ok = program();
-    expect(await ok.run(['jira', 'comment', 'add', 'PROJ-123', '--body', 'ping @jsmith'])).toBe(0);
+    expect(
+      await ok.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', 'ping @jsmith'])
+    ).toBe(0);
     expect(JSON.parse(writes(ok)[0]?.bodyText ?? '')).toEqual({ body: 'ping [~jsmith]\n' });
     const bad = program();
-    expect(await bad.run(['jira', 'comment', 'add', 'PROJ-123', '--body', 'ping @ghost'])).toBe(5);
+    expect(
+      await bad.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', 'ping @ghost'])
+    ).toBe(5);
     expect(lastJsonLine(bad.stderr())).toMatchObject({
       code: 'validation',
       message: 'unknown user: @ghost',
@@ -266,15 +295,17 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('reports lossy conversions as warnings on stderr', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'add', 'PROJ-123', '--body', '3. a\n4. b\n'])).toBe(0);
+    expect(
+      await t.run(['jira', 'issue', 'comment', 'add', 'PROJ-123', '--body', '3. a\n4. b\n'])
+    ).toBe(0);
     expect(t.stderr()).toContain('warn: ordered list starting at 3 restarts at 1 in Jira (line 1)');
   });
 
   it('edits a comment with PUT', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'edit', 'PROJ-123', '2', '--body', '**fixed**'])).toBe(
-      0
-    );
+    expect(
+      await t.run(['jira', 'issue', 'comment', 'edit', 'PROJ-123', '2', '--body', '**fixed**'])
+    ).toBe(0);
     const put = writes(t)[0];
     expect(put?.method).toBe('PUT');
     expect(put?.url.pathname).toBe('/rest/api/2/issue/PROJ-123/comment/2');
@@ -284,12 +315,12 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('deletes own comments, refuses others unless --any, and previews the delete', async () => {
     const own = program();
-    expect(await own.run(['jira', 'comment', 'delete', 'PROJ-123', '2'])).toBe(0);
+    expect(await own.run(['jira', 'issue', 'comment', 'delete', 'PROJ-123', '2'])).toBe(0);
     expect(writes(own)[0]?.method).toBe('DELETE');
     expect(own.stdout()).toBe('comment 2 deleted from PROJ-123\n');
 
     const other = program();
-    expect(await other.run(['jira', 'comment', 'delete', 'PROJ-123', '1'])).toBe(5);
+    expect(await other.run(['jira', 'issue', 'comment', 'delete', 'PROJ-123', '1'])).toBe(5);
     expect(lastJsonLine(other.stderr())).toMatchObject({
       code: 'validation',
       message: 'comment 1 on PROJ-123 was written by jdoe, not by you (jsmith)',
@@ -298,12 +329,14 @@ describe('lassi jira comment add|edit|delete', () => {
     expect(writes(other)).toHaveLength(0);
 
     const forced = program();
-    expect(await forced.run(['jira', 'comment', 'delete', 'PROJ-123', '1', '--any'])).toBe(0);
+    expect(await forced.run(['jira', 'issue', 'comment', 'delete', 'PROJ-123', '1', '--any'])).toBe(
+      0
+    );
     expect(writes(forced)[0]?.url.pathname).toBe('/rest/api/2/issue/PROJ-123/comment/1');
 
     const dry = program();
     expect(
-      await dry.run(['jira', 'comment', 'delete', 'PROJ-123', '1', '--any', '--dry-run'])
+      await dry.run(['jira', 'issue', 'comment', 'delete', 'PROJ-123', '1', '--any', '--dry-run'])
     ).toBe(0);
     expect(dry.stdout()).toBe(
       'DRY RUN — nothing sent\nDELETE /rest/api/2/issue/PROJ-123/comment/1\n--- comment ---\n1 by jdoe, 2026-09-01T10:00:00.000+0300\n'
@@ -313,7 +346,7 @@ describe('lassi jira comment add|edit|delete', () => {
 
   it('rejects a malformed key before reading the body', async () => {
     const t = program();
-    expect(await t.run(['jira', 'comment', 'add', 'proj-1', '--body', 'x'])).toBe(2);
+    expect(await t.run(['jira', 'issue', 'comment', 'add', 'proj-1', '--body', 'x'])).toBe(2);
     expect(t.fetch.calls).toHaveLength(0);
   });
 
@@ -325,7 +358,7 @@ describe('lassi jira comment add|edit|delete', () => {
     ['edit', 'PROJ-123', '10001x', '--body', 'x'],
   ])('refuses comment %s with a non-numeric id before any request: %s %s', async (...args) => {
     const t = program();
-    expect(await t.run(['jira', 'comment', ...args])).toBe(2);
+    expect(await t.run(['jira', 'issue', 'comment', ...args])).toBe(2);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'usage',
       message: expect.stringContaining('not a Jira comment id'),
@@ -899,10 +932,10 @@ describe('lassi jira issue update: edit metadata only when a change needs it', (
   });
 });
 
-describe('lassi jira transition list|do', () => {
+describe('lassi jira issue transition list|do', () => {
   it('lists transitions with target status and screen fields', async () => {
     const t = program();
-    expect(await t.run(['jira', 'transition', 'list', 'PROJ-123'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'transition', 'list', 'PROJ-123'])).toBe(0);
     expect(t.stdout()).toContain('| 31 | Done | Done | resolution* |');
     expect(t.stdout()).toContain('| 11 | Start | In Progress |  |');
   });
@@ -912,6 +945,7 @@ describe('lassi jira transition list|do', () => {
     expect(
       await t.run([
         'jira',
+        'issue',
         'transition',
         'do',
         'PROJ-123',
@@ -935,6 +969,7 @@ describe('lassi jira transition list|do', () => {
     expect(
       await dry.run([
         'jira',
+        'issue',
         'transition',
         'do',
         'PROJ-123',
@@ -950,18 +985,19 @@ describe('lassi jira transition list|do', () => {
     expect(writes(dry)).toHaveLength(0);
 
     const missing = program();
-    expect(await missing.run(['jira', 'transition', 'do', 'PROJ-123', 'Done'])).toBe(5);
+    expect(await missing.run(['jira', 'issue', 'transition', 'do', 'PROJ-123', 'Done'])).toBe(5);
     expect(lastJsonLine(missing.stderr())).toMatchObject({
       code: 'validation',
       message: 'transition Done needs: resolution',
       errors: { resolution: 'Resolution is required.' },
-      hint: 'Run `lassi jira transition list PROJ-123` to see the required screen fields.',
+      hint: 'Run `lassi jira issue transition list PROJ-123` to see the required screen fields.',
     });
 
     const value = program();
     expect(
       await value.run([
         'jira',
+        'issue',
         'transition',
         'do',
         'PROJ-123',
@@ -975,7 +1011,7 @@ describe('lassi jira transition list|do', () => {
     });
 
     const unknown = program();
-    expect(await unknown.run(['jira', 'transition', 'do', 'PROJ-123', 'Fly'])).toBe(4);
+    expect(await unknown.run(['jira', 'issue', 'transition', 'do', 'PROJ-123', 'Fly'])).toBe(4);
     expect(lastJsonLine(unknown.stderr())).toMatchObject({
       code: 'not_found',
       message: 'no transition "Fly" on PROJ-123; available: Done (31), Start (11)',
@@ -984,12 +1020,14 @@ describe('lassi jira transition list|do', () => {
   });
 });
 
-describe('lassi jira attach upload', () => {
+describe('lassi jira issue attach upload', () => {
   const files = { '/home/u/proj/shot.png': 'abc', '/home/u/proj/notes.txt': 'hello' };
 
   it('uploads each file as multipart and prints the results', async () => {
     const t = program({ files });
-    expect(await t.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png', 'notes.txt'])).toBe(0);
+    expect(
+      await t.run(['jira', 'issue', 'attach', 'upload', 'PROJ-123', 'shot.png', 'notes.txt'])
+    ).toBe(0);
     const posts = writes(t);
     expect(posts).toHaveLength(2);
     expect(posts[0]?.headers['x-atlassian-token']).toBe('no-check');
@@ -1007,7 +1045,7 @@ describe('lassi jira attach upload', () => {
   it('checks every file before uploading anything', async () => {
     const missing = program({ files });
     expect(
-      await missing.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png', 'nope.bin'])
+      await missing.run(['jira', 'issue', 'attach', 'upload', 'PROJ-123', 'shot.png', 'nope.bin'])
     ).toBe(2);
     expect(lastJsonLine(missing.stderr())).toMatchObject({ message: 'file not found: nope.bin' });
     expect(missing.fetch.calls).toHaveLength(0);
@@ -1021,7 +1059,7 @@ describe('lassi jira attach upload', () => {
         }),
       },
     });
-    expect(await big.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png'])).toBe(2);
+    expect(await big.run(['jira', 'issue', 'attach', 'upload', 'PROJ-123', 'shot.png'])).toBe(2);
     expect(lastJsonLine(big.stderr())).toMatchObject({
       message: expect.stringContaining('above attachments.maxSizeMb'),
     });
@@ -1031,14 +1069,23 @@ describe('lassi jira attach upload', () => {
   it('--dry-run lists the files and sends nothing; read-only exits 7', async () => {
     const dry = program({ files });
     expect(
-      await dry.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png', 'notes.txt', '--dry-run'])
+      await dry.run([
+        'jira',
+        'issue',
+        'attach',
+        'upload',
+        'PROJ-123',
+        'shot.png',
+        'notes.txt',
+        '--dry-run',
+      ])
     ).toBe(0);
     expect(dry.stdout()).toBe(
       'DRY RUN — nothing sent\nPOST /rest/api/2/issue/PROJ-123/attachments\n--- files (multipart) ---\nshot.png (3 B)\nnotes.txt (5 B)\n'
     );
     expect(dry.fetch.calls).toHaveLength(0);
     const ro = program({ files, env: { LASSI_READ_ONLY: 'yes' } });
-    expect(await ro.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png'])).toBe(7);
+    expect(await ro.run(['jira', 'issue', 'attach', 'upload', 'PROJ-123', 'shot.png'])).toBe(7);
     expect(ro.fetch.calls).toHaveLength(0);
   });
 
@@ -1060,7 +1107,9 @@ describe('lassi jira attach upload', () => {
         },
       ],
     });
-    expect(await t.run(['jira', 'attach', 'upload', 'PROJ-123', 'shot.png', 'notes.txt'])).toBe(1);
+    expect(
+      await t.run(['jira', 'issue', 'attach', 'upload', 'PROJ-123', 'shot.png', 'notes.txt'])
+    ).toBe(1);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       code: 'http',
       http: 413,
@@ -1069,11 +1118,11 @@ describe('lassi jira attach upload', () => {
   });
 });
 
-describe('lassi jira link create', () => {
+describe('lassi jira issue link create', () => {
   it('links with the outward phrase and flips for the inward phrase, printing the sentence', async () => {
     const outward = program();
     expect(
-      await outward.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'blocks'])
+      await outward.run(['jira', 'issue', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'blocks'])
     ).toBe(0);
     expect(JSON.parse(writes(outward)[0]?.bodyText ?? '')).toEqual({
       type: { name: 'Blocks' },
@@ -1086,6 +1135,7 @@ describe('lassi jira link create', () => {
     expect(
       await inward.run([
         'jira',
+        'issue',
         'link',
         'create',
         'PROJ-1',
@@ -1104,14 +1154,23 @@ describe('lassi jira link create', () => {
   it('reports unknown types and requires --type', async () => {
     const unknown = program();
     expect(
-      await unknown.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'duplicates'])
+      await unknown.run([
+        'jira',
+        'issue',
+        'link',
+        'create',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'duplicates',
+      ])
     ).toBe(4);
     expect(lastJsonLine(unknown.stderr())).toMatchObject({
       code: 'not_found',
       hint: expect.stringContaining('lassi jira link types'),
     });
     const none = program();
-    expect(await none.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2'])).toBe(2);
+    expect(await none.run(['jira', 'issue', 'link', 'create', 'PROJ-1', 'PROJ-2'])).toBe(2);
     expect([unknown, none].flatMap((t) => writes(t))).toHaveLength(0);
   });
 });
@@ -1189,20 +1248,20 @@ function linkingJira(): Route[] {
 /** `link list KEY` as sentences, the way the table prints them. */
 async function listed(routes: Route[], key: string): Promise<string[]> {
   const t = program({ routes });
-  expect(await t.run(['jira', 'link', 'list', key, '--json'])).toBe(0);
+  expect(await t.run(['jira', 'issue', 'link', 'list', key, '--json'])).toBe(0);
   const data = JSON.parse(t.stdout()) as {
     links: Array<{ description: string; otherKey: string }>;
   };
   return data.links.map((l) => `${key} ${l.description} ${l.otherKey}`);
 }
 
-describe("lassi jira link create|delete against Jira's link semantics", () => {
+describe("lassi jira issue link create|delete against Jira's link semantics", () => {
   it('creates the link it prints, seen the same way from both issues', async () => {
     const jira = linkingJira();
     const t = program({ routes: jira });
-    expect(await t.run(['jira', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'split to'])).toBe(
-      0
-    );
+    expect(
+      await t.run(['jira', 'issue', 'link', 'create', 'PROJ-1', 'PROJ-2', '--type', 'split to'])
+    ).toBe(0);
     expect(t.stdout()).toBe('PROJ-1 split to PROJ-2\n');
     expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 split to PROJ-2']);
     expect(await listed(jira, 'PROJ-2')).toEqual(['PROJ-2 split from PROJ-1']);
@@ -1211,6 +1270,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     expect(
       await program({ routes: flipped }).run([
         'jira',
+        'issue',
         'link',
         'create',
         'PROJ-1',
@@ -1226,6 +1286,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     const jira = linkingJira();
     await program({ routes: jira }).run([
       'jira',
+      'issue',
       'link',
       'create',
       'PROJ-1',
@@ -1235,6 +1296,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     ]);
     await program({ routes: jira }).run([
       'jira',
+      'issue',
       'link',
       'create',
       'PROJ-1',
@@ -1244,7 +1306,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     ]);
     const t = program({ routes: jira });
     expect(
-      await t.run(['jira', 'link', 'delete', 'PROJ-2', 'PROJ-1', '--type', 'split from'])
+      await t.run(['jira', 'issue', 'link', 'delete', 'PROJ-2', 'PROJ-1', '--type', 'split from'])
     ).toBe(0);
     expect(t.stdout()).toBe('deleted link: PROJ-2 split from PROJ-1\n');
     expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 blocks PROJ-2']);
@@ -1254,6 +1316,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     const jira = linkingJira();
     await program({ routes: jira }).run([
       'jira',
+      'issue',
       'link',
       'create',
       'PROJ-2',
@@ -1264,7 +1327,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 relates to PROJ-2']);
     const t = program({ routes: jira });
     expect(
-      await t.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'relates to'])
+      await t.run(['jira', 'issue', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'relates to'])
     ).toBe(0);
     expect(await listed(jira, 'PROJ-1')).toEqual([]);
   });
@@ -1274,6 +1337,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     // What earlier versions stored for `link create PROJ-1 PROJ-2 --type "split to"`.
     await program({ routes: jira }).run([
       'jira',
+      'issue',
       'link',
       'create',
       'PROJ-1',
@@ -1283,7 +1347,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     ]);
     const miss = program({ routes: jira });
     expect(
-      await miss.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'split to'])
+      await miss.run(['jira', 'issue', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'split to'])
     ).toBe(4);
     expect(lastJsonLine(miss.stderr())).toMatchObject({
       code: 'not_found',
@@ -1293,6 +1357,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     expect(
       await program({ routes: jira }).run([
         'jira',
+        'issue',
         'link',
         'delete',
         'PROJ-1',
@@ -1304,6 +1369,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     expect(
       await program({ routes: jira }).run([
         'jira',
+        'issue',
         'link',
         'create',
         'PROJ-1',
@@ -1319,6 +1385,7 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     const jira = linkingJira();
     await program({ routes: jira }).run([
       'jira',
+      'issue',
       'link',
       'create',
       'PROJ-1',
@@ -1328,22 +1395,41 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
     ]);
     const dry = program({ routes: jira });
     expect(
-      await dry.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'blocks', '--dry-run'])
+      await dry.run([
+        'jira',
+        'issue',
+        'link',
+        'delete',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'blocks',
+        '--dry-run',
+      ])
     ).toBe(0);
     expect(dry.stdout()).toBe(
       'DRY RUN — nothing sent\nDELETE /rest/api/2/issueLink/100\n--- link ---\n100: PROJ-1 blocks PROJ-2\n'
     );
     const readOnly = program({ routes: jira, env: { LASSI_READ_ONLY: '1' } });
     expect(
-      await readOnly.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'blocks'])
+      await readOnly.run([
+        'jira',
+        'issue',
+        'link',
+        'delete',
+        'PROJ-1',
+        'PROJ-2',
+        '--type',
+        'blocks',
+      ])
     ).toBe(7);
     const self = program({ routes: jira });
-    expect(await self.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-1', '--type', 'blocks'])).toBe(
-      2
-    );
+    expect(
+      await self.run(['jira', 'issue', 'link', 'delete', 'PROJ-1', 'PROJ-1', '--type', 'blocks'])
+    ).toBe(2);
     const unknown = program({ routes: jira });
     expect(
-      await unknown.run(['jira', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'clones'])
+      await unknown.run(['jira', 'issue', 'link', 'delete', 'PROJ-1', 'PROJ-2', '--type', 'clones'])
     ).toBe(4);
     expect([dry, readOnly, self, unknown].flatMap((t) => writes(t))).toHaveLength(0);
     expect(await listed(jira, 'PROJ-1')).toEqual(['PROJ-1 blocks PROJ-2']);
@@ -1353,13 +1439,17 @@ describe("lassi jira link create|delete against Jira's link semantics", () => {
 describe('"." as the issue key on writes', () => {
   it('resolves the branch key before the dry-run preview', async () => {
     const t = program({ files: { '/home/u/proj/.git/HEAD': 'ref: refs/heads/fix/PROJ-123-x\n' } });
-    expect(await t.run(['jira', 'comment', 'add', '.', '--body', 'one line', '--dry-run'])).toBe(0);
+    expect(
+      await t.run(['jira', 'issue', 'comment', 'add', '.', '--body', 'one line', '--dry-run'])
+    ).toBe(0);
     expect(t.stdout()).toContain('POST /rest/api/2/issue/PROJ-123/comment\n');
   });
 
   it('refuses to link an issue to itself', async () => {
     const t = program({ files: { '/home/u/proj/.git/HEAD': 'ref: refs/heads/fix/PROJ-123-x\n' } });
-    expect(await t.run(['jira', 'link', 'create', '.', 'PROJ-123', '--type', 'blocks'])).toBe(2);
+    expect(
+      await t.run(['jira', 'issue', 'link', 'create', '.', 'PROJ-123', '--type', 'blocks'])
+    ).toBe(2);
     expect(lastJsonLine(t.stderr())).toMatchObject({
       message: 'cannot link PROJ-123 to itself',
     });

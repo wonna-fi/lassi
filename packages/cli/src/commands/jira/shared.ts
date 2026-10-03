@@ -45,7 +45,7 @@ export async function withProjectHints<T>(
       if (err.code === 'not_found') {
         err.hint = `check the project key ${project} (the part of an issue key before the dash)`;
       } else if (err.code === 'auth' && err.http === 403 && opts.creatingComponent) {
-        err.hint = `creating a component needs the Administer Projects permission in ${project}; ask a project admin, or use an existing component (\`lassi jira component list ${project}\`)`;
+        err.hint = `creating a component needs the Administer Projects permission in ${project}; ask a project admin, or use an existing component (\`lassi jira project component list ${project}\`)`;
       }
     }
     throw err;

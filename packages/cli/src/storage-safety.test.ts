@@ -6,7 +6,7 @@ describe('storage and write protection', () => {
     'blocks writes before network access when read-only is %s',
     async (value) => {
       const t = makeTestProgram({ env: { LASSI_READ_ONLY: value } });
-      expect(await t.run(['jira', 'comment', 'add', 'PROJ-1', '--body', 'hello'])).toBe(7);
+      expect(await t.run(['jira', 'issue', 'comment', 'add', 'PROJ-1', '--body', 'hello'])).toBe(7);
       expect(t.fetch.calls).toHaveLength(0);
       expect(t.stderr()).toContain('LASSI_READ_ONLY is set');
     }

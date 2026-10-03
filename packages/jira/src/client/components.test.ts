@@ -57,7 +57,7 @@ describe('planComponentAdd', () => {
       expect.objectContaining({
         code: 'not_found',
         message: 'no components "Mobile", "Data" in PROJ; components: Backend, Frontend',
-        hint: 'pass --create to create them, or run `lassi jira component list PROJ`',
+        hint: 'pass --create to create them, or run `lassi jira project component list PROJ`',
       })
     );
     expect(plan(['Backend', 'Mobile', 'mobile'], { create: true })).toEqual({

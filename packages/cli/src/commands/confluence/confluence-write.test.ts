@@ -641,13 +641,13 @@ describe('lassi confluence page update', () => {
   );
 });
 
-describe('lassi confluence comment add and delete', () => {
+describe('lassi confluence page comment add and delete', () => {
   it('adds a footer comment from markdown', async () => {
     const { routes, state } = server();
     const t = program(routes);
-    expect(await t.run(['confluence', 'comment', 'add', '123456', '--body', 'Looks *good*'])).toBe(
-      0
-    );
+    expect(
+      await t.run(['confluence', 'page', 'comment', 'add', '123456', '--body', 'Looks *good*'])
+    ).toBe(0);
     expect(state.posts).toEqual([
       {
         type: 'comment',
@@ -660,7 +660,7 @@ describe('lassi confluence comment add and delete', () => {
       JSON.parse(
         await (async () => {
           const j = program(routes);
-          await j.run(['confluence', 'comment', 'add', '123456', '--body', 'x', '--json']);
+          await j.run(['confluence', 'page', 'comment', 'add', '123456', '--body', 'x', '--json']);
           return j.stdout();
         })()
       )
