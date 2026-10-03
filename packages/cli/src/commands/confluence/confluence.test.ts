@@ -391,10 +391,10 @@ describe('lassi confluence search and tree', () => {
   });
 });
 
-describe('lassi confluence comment list and attach get', () => {
+describe('lassi confluence page comment list and attach get', () => {
   it('comment list renders every footer comment as markdown', async () => {
     const t = program();
-    expect(await t.run(['confluence', 'comment', 'list', '123456'])).toBe(0);
+    expect(await t.run(['confluence', 'page', 'comment', 'list', '123456'])).toBe(0);
     expect(t.stdout()).toBe('### jdoe · 2026-09-02T08:00:00.000+0300 · id 777\n\nLooks *good*\n');
     const call = t.fetch.calls[0];
     expect(call?.url.pathname).toBe('/rest/api/content/123456/child/comment');
@@ -406,7 +406,7 @@ describe('lassi confluence comment list and attach get', () => {
     const dir = await mkdtemp(join(tmpdir(), 'lassi-conf-attach-'));
     tmpDirs.push(dir);
     const t = program();
-    expect(await t.run(['confluence', 'attach', 'get', '123456', '--out', dir])).toBe(0);
+    expect(await t.run(['confluence', 'page', 'attach', 'get', '123456', '--out', dir])).toBe(0);
     expect(await readFile(join(dir, 'diagram.png'))).toEqual(Buffer.from([1, 2, 3]));
     expect(t.stdout()).toContain('| File | Path | Bytes | MIME | Status |');
     expect(t.stdout()).toContain('| diagram.png |');
@@ -418,6 +418,7 @@ describe('lassi confluence comment list and attach get', () => {
     const only = program();
     await only.run([
       'confluence',
+      'page',
       'attach',
       'get',
       '123456',
@@ -432,7 +433,17 @@ describe('lassi confluence comment list and attach get', () => {
     expect(only.stdout()).toContain('| huge.zip |');
 
     const none = program();
-    await none.run(['confluence', 'attach', 'get', '123456', '--out', dir, '--only', '*.pdf']);
+    await none.run([
+      'confluence',
+      'page',
+      'attach',
+      'get',
+      '123456',
+      '--out',
+      dir,
+      '--only',
+      '*.pdf',
+    ]);
     expect(none.stdout()).toBe('no attachments matching *.pdf on page 123456\n');
   });
 });

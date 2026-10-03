@@ -85,7 +85,7 @@ export function planComponentAdd(
       'not_found',
       `no component${s} ${quoted(plan.create)} in ${opts.project}; components: ${nameList(opts.projectComponents.filter((c) => !c.archived))}`,
       {
-        hint: `pass --create to create ${s ? 'them' : 'it'}, or run \`lassi jira component list ${opts.project}\``,
+        hint: `pass --create to create ${s ? 'them' : 'it'}, or run \`lassi jira project component list ${opts.project}\``,
         context,
       }
     );

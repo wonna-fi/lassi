@@ -16,7 +16,6 @@ import {
   aliasesOf,
   commentsOption,
   flattenFieldMeta,
-  group,
   jiraClient,
   renderFieldMetaTable,
 } from './shared.js';
@@ -127,9 +126,7 @@ function splitFields(value: string | undefined): string[] | undefined {
   return names.length > 0 ? names : undefined;
 }
 
-export function registerIssue(jira: Command, deps: CliDeps, session: Session): void {
-  const issue = group(jira, 'issue', 'read, search, create and update issues');
-
+export function registerIssue(issue: Command, deps: CliDeps, session: Session): void {
   const get = issue
     .command('get <KEY>')
     .description(

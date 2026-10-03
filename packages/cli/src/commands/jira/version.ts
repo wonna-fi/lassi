@@ -16,9 +16,9 @@ import { group, jiraClient, withProjectHints } from './shared.js';
 
 const joined = (names: string[]): string => (names.length === 0 ? 'none' : names.join(', '));
 
-/** `jira version …`: the versions of a project. */
-export function registerVersion(jira: Command, deps: CliDeps, session: Session): void {
-  const version = group(jira, 'version', 'project versions');
+/** `jira project version …`: the versions of a project. */
+export function registerVersion(project: Command, deps: CliDeps, session: Session): void {
+  const version = group(project, 'version', 'project versions');
 
   const list = version
     .command('list <PROJECT>')
@@ -65,7 +65,7 @@ export function registerIssueFixVersion(issue: Command, deps: CliDeps, session: 
   const set = fixVersion
     .command('set <KEY> <VERSION...>')
     .description(
-      "replace the issue's fix versions with these (--add keeps the ones it has); each must be a version `jira version list` shows"
+      "replace the issue's fix versions with these (--add keeps the ones it has); each must be a version `jira project version list` shows"
     )
     .option('--add', 'add to the fix versions the issue has instead of replacing them');
   attach<[string, string[]], { add?: boolean }>(set, deps, session, {

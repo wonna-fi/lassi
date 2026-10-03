@@ -28,7 +28,7 @@ export function resolveVersions(
   }
   const allowed = `allowed: ${nameList(allowedVersions(versions))}`;
   const opts = {
-    hint: `run \`lassi jira version list ${project}\``,
+    hint: `run \`lassi jira project version list ${project}\``,
     context: { product: 'jira' as const },
   };
   if (unknown.length > 0) {

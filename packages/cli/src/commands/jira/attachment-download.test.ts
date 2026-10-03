@@ -45,7 +45,7 @@ function program(names = ['screenshot.png', 'screenshot.png'], failure = false) 
     ],
   });
 }
-const args = (dir: string) => ['jira', 'attach', 'get', 'PROJ-1', '--out', dir, '--json'];
+const args = (dir: string) => ['jira', 'issue', 'attach', 'get', 'PROJ-1', '--out', dir, '--json'];
 
 describe('Jira attachment identity and batch results', () => {
   it('preserves both same-name files and returns their ID-to-path mapping', async () => {

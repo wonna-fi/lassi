@@ -26,7 +26,7 @@ export function resolveTransition(
     'not_found',
     `no transition "${nameOrId}" on ${issueKey}; available: ${names || 'none'}`,
     {
-      hint: `run \`lassi jira transition list ${issueKey}\``,
+      hint: `run \`lassi jira issue transition list ${issueKey}\``,
       context: { product: 'jira', issueKey, transition: true },
     }
   );

@@ -159,7 +159,15 @@ export async function evaluateRetrieval(
     return JSON.parse(output);
   };
   const issue = await run(['jira', 'issue', 'get', 'PROJ-101', '--all']);
-  const attachments = await run(['jira', 'attach', 'get', 'PROJ-112', '--out', opts.attachmentDir]);
+  const attachments = await run([
+    'jira',
+    'issue',
+    'attach',
+    'get',
+    'PROJ-112',
+    '--out',
+    opts.attachmentDir,
+  ]);
   const attachmentText = await readFile(resolve(p.deps.cwd, attachments.files[0].path), 'utf8');
   await run(['jira', 'issue', 'export', 'project = PROJ', '--comments']);
   const index = await run(['search', 'index']);

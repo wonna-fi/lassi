@@ -14,12 +14,8 @@ interface GetOptions {
   maxSize?: string;
 }
 
-export function registerAttach(confluence: Command, deps: CliDeps, session: Session): Command {
-  const att = group(
-    confluence,
-    'attach',
-    'attachments (files on disk, never in the context window)'
-  );
+export function registerAttach(page: Command, deps: CliDeps, session: Session): Command {
+  const att = group(page, 'attach', 'attachments (files on disk, never in the context window)');
   const get = att
     .command('get <PAGE_ID>')
     .description('download all (or matching) attachments to <dir>/<PAGE_ID>/')

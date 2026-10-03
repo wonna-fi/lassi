@@ -73,17 +73,17 @@ lassi confluence page update 123456 --parent 100
 ## Comments
 
 ```sh
-lassi confluence comment list 123456
-lassi confluence comment add 123456 --body "Reviewed the failover section; two questions inline." --dry-run
-lassi confluence comment add 123456 --body "Reviewed the failover section; two questions inline."
+lassi confluence page comment list 123456
+lassi confluence page comment add 123456 --body "Reviewed the failover section; two questions inline." --dry-run
+lassi confluence page comment add 123456 --body "Reviewed the failover section; two questions inline."
 lassi confluence comment delete 777                     # own comments only; --any if the human asked
 ```
 
 ## Attachments
 
 ```sh
-lassi confluence attach get 123456                      # to .lassi/123456/ (size cap from config)
-lassi confluence attach get 123456 --only "*.pdf" --out ./tmp/123456
+lassi confluence page attach get 123456                      # to .lassi/123456/ (size cap from config)
+lassi confluence page attach get 123456 --only "*.pdf" --out ./tmp/123456
 ```
 
 Then read the files with your own tools. If a download yields an HTML page instead of the file, the
