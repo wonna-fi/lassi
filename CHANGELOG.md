@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.8
+
 ### Breaking changes
 
 - Jira custom fields are read-only unless their `jira.fields` entry marks them editable:
@@ -17,6 +19,16 @@
 - `jira.fields` entries take `format: "wiki"` to show a field's Jira wiki markup as Markdown, and
   `exclude: true` to leave a field out of working files, issue output and exports.
 - `lassi jira fields` and the generated `references/fields.md` show each alias's access and format.
+- Issue creation reuses create metadata for up to 24 hours per issue type. Run
+  `lassi jira issue createmeta <PROJECT> --type <TYPE>` to refresh it explicitly, or omit
+  `--type` to refresh every issue type in the project. Dry-run creation can also populate the
+  cache without creating an issue.
+
+### Fixed
+
+- Create-field metadata requests allow at least three minutes and do not retry their own
+  timeout. Timeout and cached-validation errors include instructions to refresh metadata.
+- Updated development dependencies to clear all reported npm audit findings.
 
 ### Upgrading
 
