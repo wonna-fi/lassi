@@ -147,7 +147,9 @@ export function assertWritable(
     const alias = aliasFor(policy.aliases, id);
     // Not the alias aliasFor finds: another alias of the same field may be the one that says so.
     if (policy.settings[id]?.editable === false) {
-      return `remove "editable": false from the jira.fields entry for ${id}`;
+      return CUSTOM_FIELD_ID.test(id)
+        ? `set "editable": true on every jira.fields entry for ${id}`
+        : `remove "editable": false from the jira.fields entry for ${id}`;
     }
     return alias === undefined
       ? `add { "id": "${id}", "editable": true } under jira.fields`

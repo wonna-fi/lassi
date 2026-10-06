@@ -197,4 +197,24 @@ describe('assertWritable', () => {
       })
     );
   });
+
+  it('explains how to enable an explicitly read-only custom field across aliases', () => {
+    const field = [{ key: 'points', id: 'customfield_10005' }];
+    const entries = {
+      points: 'customfield_10005',
+      estimate: { id: 'customfield_10005', editable: false },
+    };
+    expect(() => assertWritable(fieldPolicy(entries), field, context)).toThrow(
+      expect.objectContaining({
+        hint: expect.stringContaining(
+          'set "editable": true on every jira.fields entry for customfield_10005'
+        ),
+      })
+    );
+    const enabled = fieldPolicy({
+      points: { id: 'customfield_10005', editable: true },
+      estimate: { id: 'customfield_10005', editable: true },
+    });
+    expect(() => assertWritable(enabled, field, context)).not.toThrow();
+  });
 });
