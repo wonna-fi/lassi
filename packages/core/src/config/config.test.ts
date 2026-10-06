@@ -626,6 +626,76 @@ describe('jira.templates', () => {
   });
 });
 
+describe('jira.fields', () => {
+  const homedir = '/home/u';
+  const cwd = '/home/u/proj/sub';
+  const load = (global: unknown, workspace?: unknown) =>
+    loadConfig({
+      env: {},
+      cwd,
+      homedir,
+      fs: memFs({
+        '/home/u/.lassi.json': JSON.stringify({ jira: { fields: global } }),
+        ...(workspace === undefined
+          ? {}
+          : { '/home/u/proj/.lassi.json': JSON.stringify({ jira: { fields: workspace } }) }),
+      }),
+    });
+
+  it('keeps a string as written next to the object form', async () => {
+    const loaded = await load({
+      points: 'customfield_10005',
+      team: { id: 'customfield_10030', editable: true, format: 'wiki', exclude: false },
+    });
+    expect(loaded.config.jira.fields).toEqual({
+      points: 'customfield_10005',
+      team: { id: 'customfield_10030', editable: true, format: 'wiki', exclude: false },
+    });
+    expect(loaded.sources['jira.fields.team.editable']).toEqual({
+      source: 'global',
+      from: '/home/u/.lassi.json',
+    });
+  });
+
+  it('names what is wrong with an object entry instead of only "invalid input"', async () => {
+    const cases: Array<[unknown, string]> = [
+      [{ editable: true }, 'expected string, received undefined\n  → at jira.fields.team.id'],
+      [{ id: 'customfield_1', format: 'html' }, 'expected one of "raw"|"wiki"'],
+      [{ id: 'customfield_1', editable: 'yes' }, 'expected boolean, received string'],
+      [{ id: 'customfield_1', hidden: true }, 'Unrecognized key: "hidden"'],
+      [5, 'expected a field id or { "id": "...", "editable": true }'],
+    ];
+    for (const [entry, needle] of cases) {
+      await expect(load({ team: entry })).rejects.toSatisfy(
+        (e: unknown) => isLassiError(e) && e.code === 'usage' && e.message.includes(needle)
+      );
+    }
+  });
+
+  it('lets the later layer win between a string and an object, and merges two objects per setting', async () => {
+    expect(
+      (await load({ team: 'customfield_1' }, { team: { id: 'customfield_2', editable: true } }))
+        .config.jira.fields
+    ).toEqual({ team: { id: 'customfield_2', editable: true } });
+    expect(
+      (await load({ team: { id: 'customfield_1', editable: true } }, { team: 'customfield_2' }))
+        .config.jira.fields
+    ).toEqual({ team: 'customfield_2' });
+    expect(
+      (
+        await load(
+          { team: { id: 'customfield_1', editable: true } },
+          { team: { editable: false, format: 'wiki' } }
+        )
+      ).config.jira.fields
+    ).toEqual({ team: { id: 'customfield_1', editable: false, format: 'wiki' } });
+    // An object over a string has no id to merge with, and says so.
+    await expect(load({ team: 'customfield_1' }, { team: { editable: true } })).rejects.toSatisfy(
+      (e: unknown) => isLassiError(e) && e.message.includes('at jira.fields.team.id')
+    );
+  });
+});
+
 describe('resolvePath / displayPath', () => {
   it('keeps the flavour of an absolute argument and follows the cwd otherwise', async () => {
     const { displayPath, resolvePath } = await import('../fs/paths.js');

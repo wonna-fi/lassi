@@ -1,33 +1,50 @@
 import type { Command } from 'commander';
-import type { JiraFieldDef, JiraLinkType } from '@wonna/lassi-jira';
+import {
+  formatOf,
+  isExcluded,
+  isWritable,
+  type FieldFormat,
+  type FieldPolicy,
+  type JiraFieldDef,
+  type JiraLinkType,
+} from '@wonna/lassi-jira';
 import type { Context } from '../../context.js';
 import type { CliDeps } from '../../deps.js';
 import { renderTable } from '../../output/table.js';
 import { attach, type Session } from '../../run-command.js';
 import { registerGenerated } from '../skills/generated.js';
-import { aliasesOf, jiraClient } from './shared.js';
+import { fieldPolicyOf, jiraClient } from './shared.js';
 
-export interface FieldsReport {
-  resolved: Array<{ alias: string; id: string; name: string; type: string }>;
-  unresolved: Array<{ alias: string; id: string }>;
+/** What Lassi does with one aliased field, from `jira.fields`. */
+interface FieldAccess {
+  editable: boolean;
+  format: FieldFormat;
+  exclude: boolean;
 }
 
-export function buildFieldsReport(
-  aliases: Record<string, string>,
-  defs: JiraFieldDef[]
-): FieldsReport {
+export interface FieldsReport {
+  resolved: Array<{ alias: string; id: string; name: string; type: string } & FieldAccess>;
+  unresolved: Array<{ alias: string; id: string } & FieldAccess>;
+}
+
+export function buildFieldsReport(policy: FieldPolicy, defs: JiraFieldDef[]): FieldsReport {
   const byId = new Map(defs.map((d) => [d.id, d]));
   const report: FieldsReport = { resolved: [], unresolved: [] };
-  for (const [alias, id] of Object.entries(aliases)) {
+  for (const [alias, id] of Object.entries(policy.aliases)) {
+    const access: FieldAccess = {
+      editable: isWritable(policy, id),
+      format: formatOf(policy, id),
+      exclude: isExcluded(policy, id),
+    };
     const def = byId.get(id);
     if (def) {
       const type =
         def.schema?.type === 'array'
           ? `array<${def.schema.items ?? '?'}>`
           : (def.schema?.type ?? '?');
-      report.resolved.push({ alias, id, name: def.name, type });
+      report.resolved.push({ alias, id, name: def.name, type, ...access });
     } else {
-      report.unresolved.push({ alias, id });
+      report.unresolved.push({ alias, id, ...access });
     }
   }
   return report;
@@ -40,8 +57,16 @@ export function renderFields(report: FieldsReport, opts: { md: boolean }): strin
       { key: 'id', header: 'Field id' },
       { key: 'name', header: 'Name' },
       { key: 'type', header: 'Type' },
+      { key: 'access', header: 'Access' },
+      { key: 'notes', header: 'Notes' },
     ],
-    report.resolved
+    report.resolved.map((r) => ({
+      ...r,
+      access: r.editable ? 'editable' : 'read-only',
+      notes: [r.format === 'wiki' ? 'wiki' : '', r.exclude ? 'excluded' : '']
+        .filter(Boolean)
+        .join(', '),
+    }))
   );
   const unresolved =
     report.unresolved.length > 0
@@ -55,9 +80,12 @@ export function renderFields(report: FieldsReport, opts: { md: boolean }): strin
   return [
     '# Jira field aliases',
     '',
-    'Use the alias with `--field alias=value` and as a frontmatter key in working files; the CLI maps it',
-    'to the field id. Run `lassi jira issue createmeta <PROJECT> --type <TYPE>` for required flags and',
-    'allowed values.',
+    'Custom fields are read-only unless `jira.fields` marks them editable, and unaliased custom fields are',
+    'always read-only. Set an editable field with `--field alias=value` (or its raw id) or as a top-level',
+    'frontmatter key in a working file; the CLI maps the alias to the field id. Read-only fields appear',
+    'under `readonly` in working files, and excluded fields are left out. A `wiki` field shows Jira wiki',
+    'markup as Markdown: write Markdown to it, never JSON or wiki markup. Run',
+    '`lassi jira issue createmeta <PROJECT> --type <TYPE>` for required flags and allowed values.',
     '',
     report.resolved.length > 0 ? table : '(no aliases configured)\n',
     unresolved,
@@ -89,14 +117,15 @@ export function renderLinkTypes(types: JiraLinkType[], opts: { md: boolean }): s
 export function registerReference(jira: Command, deps: CliDeps, session: Session): void {
   const fields = jira
     .command('fields')
-    .description('configured field aliases resolved against this instance')
+    .description('configured field aliases resolved against this instance, with their access')
     .option('--md', 'render the skill reference (fields.md)');
   attach<[], { md?: boolean }>(fields, deps, session, {
     kind: 'read',
     async run(ctx, _args, opts) {
-      const aliases = aliasesOf(ctx);
-      const defs = Object.keys(aliases).length > 0 ? await (await jiraClient(ctx)).fields() : [];
-      const report = buildFieldsReport(aliases, defs);
+      const policy = fieldPolicyOf(ctx);
+      const defs =
+        Object.keys(policy.aliases).length > 0 ? await (await jiraClient(ctx)).fields() : [];
+      const report = buildFieldsReport(policy, defs);
       return { markdown: renderFields(report, { md: Boolean(opts.md) }), data: report };
     },
   });
@@ -115,9 +144,10 @@ export function registerReference(jira: Command, deps: CliDeps, session: Session
   });
 
   registerGenerated('jira/references/fields.md', async (ctx: Context) => {
-    const aliases = aliasesOf(ctx);
-    const defs = Object.keys(aliases).length > 0 ? await (await jiraClient(ctx)).fields() : [];
-    return renderFields(buildFieldsReport(aliases, defs), { md: true });
+    const policy = fieldPolicyOf(ctx);
+    const defs =
+      Object.keys(policy.aliases).length > 0 ? await (await jiraClient(ctx)).fields() : [];
+    return renderFields(buildFieldsReport(policy, defs), { md: true });
   });
   registerGenerated('jira/references/link-types.md', async (ctx: Context) => {
     const list = await (await jiraClient(ctx)).getLinkTypes();

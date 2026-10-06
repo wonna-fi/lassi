@@ -7,6 +7,7 @@ import {
   toStderr,
   LassiError,
 } from '@wonna/lassi-core';
+import { fieldAliases } from '@wonna/lassi-jira';
 import { buildContext, type Context, type GlobalFlags } from './context.js';
 import type { CliDeps } from './deps.js';
 import { assertWriteAllowed } from './guard-write.js';
@@ -54,7 +55,8 @@ export function enrichError(err: LassiError, ctx: Context | undefined): LassiErr
       const tokenFile = ctx.config[product].tokenFile;
       if (tokenFile) err.context.tokenFile = tokenFile;
     }
-    const aliases = ctx.config.jira.fields;
+    // Not the validated policy: this runs for every failure, the policy's own included.
+    const aliases = fieldAliases(ctx.config.jira.fields);
     if (Object.keys(aliases).length > 0) attachAliases(err, aliases);
   }
   if (err.hint === undefined) {

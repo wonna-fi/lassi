@@ -24,7 +24,7 @@ import {
   writeExportManifest,
 } from '../shared/export-manifest.js';
 import { serverIssueKey } from '../shared/identifiers.js';
-import { jiraClient } from './shared.js';
+import { fieldPolicyOf, jiraClient } from './shared.js';
 import { buildIssueDocument, loadIssueComments, saveIssueWorkingFile } from './workfile.js';
 
 interface ExportOptions {
@@ -75,7 +75,7 @@ export function registerIssueExport(issue: Command, deps: CliDeps, session: Sess
           limit,
           now: deps.now().toISOString(),
         });
-        const renderHash = exportRenderHash('jira', opts.comments === true, ctx.config.jira.fields);
+        const renderHash = exportRenderHash('jira', opts.comments === true, fieldPolicyOf(ctx));
         await writeExportManifest(deps.fs, dir, manifest);
         const stats = { total: 0, written: 0, unchanged: 0, failed: 0, truncated: false };
         const conflicts = new Map<string, string>();

@@ -176,7 +176,10 @@ const ROUTES: Route[] = [
 const WORKSPACE = {
   '/home/u/proj/.lassi.json': JSON.stringify({
     jira: {
-      fields: { team: 'customfield_10001', ghost: 'customfield_10009' },
+      fields: {
+        team: { id: 'customfield_10001', editable: true },
+        ghost: 'customfield_10009',
+      },
       defaultProject: 'PROJ',
     },
   }),
@@ -201,8 +204,12 @@ describe('lassi jira issue get', () => {
     expect(await t.run(['jira', 'issue', 'get', 'PROJ-123'])).toBe(0);
     const out = t.stdout();
     const head =
-      '---\nkey: PROJ-123\nsummary: Login page throws 500 on empty password\ntype: Bug\npriority: High\nassignee: jsmith\nlabels:\n  - auth\n  - regression\nteam: Platform\nghost: null\ncustomfield_10005: 3 # Story Points\nreadonly:\n';
+      '---\nkey: PROJ-123\nsummary: Login page throws 500 on empty password\ntype: Bug\npriority: High\nassignee: jsmith\nlabels:\n  - auth\n  - regression\nteam: Platform\nreadonly:\n  id: "40213"\n';
     expect(out.slice(0, head.length)).toBe(head);
+    // A string alias of a custom field and an unaliased custom field are read-only facts.
+    expect(out).toContain(
+      '  url: https://jira.example.internal/browse/PROJ-123\n  ghost: null\n  customfield_10005: 3 # Story Points\ncounts:'
+    );
     expect(out).toContain('counts: { comments: 7, attachments: 2, links: 1 }');
     expect(out).toContain('\n---\n\n## Steps\n\n1. one\n2. two\n\nSee @jdoe.\n');
     expect(
@@ -239,7 +246,7 @@ describe('lassi jira issue get', () => {
     const t = program();
     expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md'])).toBe(0);
     const file = await t.fs.readFile('/home/u/proj/work/PROJ-123.md');
-    expect(file).toContain('customfield_10005: 3 # Story Points');
+    expect(file).toContain('  customfield_10005: 3 # Story Points');
     expect(file).toContain('## Steps');
     const cache = JSON.parse(
       await t.fs.readFile('/home/u/proj/.lassi/cache/jira/PROJ-123.json')
@@ -287,6 +294,118 @@ describe('lassi jira issue get', () => {
   });
 });
 
+describe('custom-field policy in issue output', () => {
+  /** A fabricated issue whose plugin field reads differently every time, as an object hash would. */
+  function volatileProgram(fields: Record<string, unknown>) {
+    const state = { reads: 0, summary: 'Volatile field' };
+    const t = makeTestProgram({
+      env: BOTH_PRODUCTS_ENV,
+      routes: [
+        {
+          method: 'GET',
+          path: '/rest/api/2/issue/PROJ-7',
+          handler: () => {
+            state.reads += 1;
+            return {
+              json: {
+                id: '7',
+                key: 'PROJ-7',
+                fields: {
+                  summary: state.summary,
+                  issuetype: { id: '1', name: 'Task' },
+                  status: { name: 'Open' },
+                  updated: '2026-09-03T14:02:10.000+0300',
+                  customfield_10040: `{summaryBean=example.SummaryBean@${state.reads.toString(16)}f00}`,
+                  customfield_10005: 3,
+                },
+                names: { customfield_10040: 'Development', customfield_10005: 'Story Points' },
+                schema: {
+                  customfield_10040: { type: 'any' },
+                  customfield_10005: { type: 'number' },
+                },
+              },
+            };
+          },
+        },
+      ],
+      files: { '/home/u/proj/.lassi.json': JSON.stringify({ jira: { fields } }) },
+    });
+    return { t, state };
+  }
+
+  async function twoReads(t: ReturnType<typeof makeTestProgram>, between = () => {}) {
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-7', '--out', 'work/PROJ-7.md'])).toBe(0);
+    const first = await t.fs.readFile('/home/u/proj/work/PROJ-7.md');
+    between();
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-7', '--out', 'work/PROJ-7.md'])).toBe(0);
+    return [first, await t.fs.readFile('/home/u/proj/work/PROJ-7.md')] as const;
+  }
+
+  it('writes the same file twice for an unchanged issue when the volatile field is excluded', async () => {
+    const { t } = volatileProgram({ development: { id: 'customfield_10040', exclude: true } });
+    const [first, second] = await twoReads(t);
+    expect(first).not.toContain('summaryBean');
+    expect(first).not.toContain('Development');
+    expect(second).toBe(first);
+    const cache = await t.fs.readFile('/home/u/proj/.lassi/cache/jira/PROJ-7.json');
+    expect(cache).not.toContain('summaryBean');
+  });
+
+  it('shows the volatile value as a read-only fact that differs on every read without the policy', async () => {
+    const { t } = volatileProgram({});
+    const [first, second] = await twoReads(t);
+    expect(first).toContain(
+      '  customfield_10040: "{summaryBean=example.SummaryBean@1f00}" # Development'
+    );
+    expect(second).not.toBe(first);
+  });
+
+  it('still shows a change to another field', async () => {
+    const { t, state } = volatileProgram({
+      development: { id: 'customfield_10040', exclude: true },
+    });
+    const [first, second] = await twoReads(t, () => {
+      state.summary = 'Volatile field, renamed';
+    });
+    const changed = second.split('\n').filter((line, i) => line !== first.split('\n')[i]);
+    expect(changed).toEqual(['summary: Volatile field, renamed']);
+  });
+
+  it('keeps the raw value in --json while the frontmatter leaves it out', async () => {
+    const { t } = volatileProgram({ development: { id: 'customfield_10040', exclude: true } });
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-7', '--json'])).toBe(0);
+    const doc = JSON.parse(t.stdout()) as {
+      frontmatter: Record<string, unknown> & { readonly: Record<string, unknown> };
+      issue: { fields: Record<string, unknown> };
+    };
+    expect(doc.issue.fields['customfield_10040']).toContain('summaryBean');
+    expect(JSON.stringify(doc.frontmatter)).not.toContain('summaryBean');
+    expect(doc.frontmatter.readonly['customfield_10005']).toBe(3);
+  });
+
+  it('keeps unaliased custom fields out of --axi and read-only aliases in it', async () => {
+    const t = program();
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--axi'])).toBe(0);
+    expect(t.stdout()).not.toContain('customfield_10005');
+    expect(t.stdout()).toContain('  ghost: null\n');
+    expect(t.stdout()).toContain('  team: Platform\n');
+  });
+
+  it('keeps a field configured under its raw id in --axi', async () => {
+    const t = makeTestProgram({
+      env: BOTH_PRODUCTS_ENV,
+      routes: ROUTES,
+      files: {
+        '/home/u/proj/.lassi.json': JSON.stringify({
+          jira: { fields: { customfield_10005: { id: 'customfield_10005', editable: true } } },
+        }),
+      },
+    });
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--axi'])).toBe(0);
+    expect(t.stdout()).toContain('  customfield_10005: 3\n');
+  });
+});
+
 describe('lassi jira issue search / createmeta / editmeta', () => {
   it('search renders a table and honours --limit and --all', async () => {
     const t = program();
@@ -327,7 +446,7 @@ describe('lassi jira fields / comment list / link / attach', () => {
   it('fields resolves aliases against the instance and renders the skill reference with --md', async () => {
     const t = program();
     expect(await t.run(['jira', 'fields'])).toBe(0);
-    expect(t.stdout()).toContain('| team | customfield_10001 | Team | option |');
+    expect(t.stdout()).toContain('| team | customfield_10001 | Team | option | editable |  |');
     expect(t.stdout()).toContain(
       'Unresolved aliases (not a field on this instance): ghost → customfield_10009'
     );
@@ -338,6 +457,76 @@ describe('lassi jira fields / comment list / link / attach', () => {
     await none.run(['jira', 'fields']);
     expect(none.stdout()).toBe('no field aliases configured (jira.fields in .lassi.json)\n');
     expect(none.fetch.calls).toHaveLength(0);
+  });
+
+  it('fields shows what Lassi may do with each aliased field', async () => {
+    const policyProgram = () =>
+      makeTestProgram({
+        env: BOTH_PRODUCTS_ENV,
+        routes: [
+          {
+            path: '/rest/api/2/field',
+            json: [
+              { id: 'customfield_10001', name: 'Team', custom: true, schema: { type: 'option' } },
+              {
+                id: 'customfield_10005',
+                name: 'Story Points',
+                custom: true,
+                schema: { type: 'number' },
+              },
+              { id: 'customfield_10020', name: 'Notes', custom: true, schema: { type: 'string' } },
+              {
+                id: 'customfield_10040',
+                name: 'Development',
+                custom: true,
+                schema: { type: 'any' },
+              },
+            ],
+          },
+        ],
+        files: {
+          '/home/u/proj/.lassi.json': JSON.stringify({
+            jira: {
+              fields: {
+                team: { id: 'customfield_10001', editable: true },
+                points: 'customfield_10005',
+                notes: { id: 'customfield_10020', format: 'wiki', editable: true },
+                development: { id: 'customfield_10040', exclude: true },
+              },
+            },
+          }),
+        },
+      });
+    const t = policyProgram();
+    expect(await t.run(['jira', 'fields'])).toBe(0);
+    expect(t.stdout()).toContain('| team | customfield_10001 | Team | option | editable |  |');
+    expect(t.stdout()).toContain(
+      '| points | customfield_10005 | Story Points | number | read-only |  |'
+    );
+    expect(t.stdout()).toContain(
+      '| notes | customfield_10020 | Notes | string | editable | wiki |'
+    );
+    expect(t.stdout()).toContain(
+      '| development | customfield_10040 | Development | any | read-only | excluded |'
+    );
+    const json = policyProgram();
+    await json.run(['jira', 'fields', '--json']);
+    expect(JSON.parse(json.stdout())).toMatchObject({
+      resolved: expect.arrayContaining([
+        expect.objectContaining({
+          alias: 'points',
+          editable: false,
+          format: 'raw',
+          exclude: false,
+        }),
+        expect.objectContaining({ alias: 'notes', editable: true, format: 'wiki', exclude: false }),
+      ]),
+    });
+    const md = policyProgram();
+    await md.run(['jira', 'fields', '--md']);
+    expect(md.stdout()).toContain(
+      'Custom fields are read-only unless `jira.fields` marks them editable'
+    );
   });
 
   it('comment list --limit fetches the newest and notes the total', async () => {

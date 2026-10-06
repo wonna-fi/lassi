@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { LassiError, pathApi, splitFrontmatter, type LassiFs } from '@wonna/lassi-core';
+import type { FieldPolicy } from '@wonna/lassi-jira';
 
 export interface ExportEntry {
   marker: string;
@@ -211,21 +212,27 @@ export function exportSummary(what: string, dir: string, stats: ExportStats): st
   return `exported ${stats.total} ${what} to ${dir} (${parts.join(', ')})${note}\n`;
 }
 
+const byKey = ([a]: [string, unknown], [b]: [string, unknown]) => a.localeCompare(b);
+
 export function exportRenderHash(
   product: ExportManifest['product'],
   comments: boolean,
-  aliases: Record<string, string> = {}
+  fields?: FieldPolicy
 ): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify({
-        renderer: 1,
-        product,
-        comments,
-        aliases: Object.entries(aliases).sort(([a], [b]) => a.localeCompare(b)),
-      })
-    )
-    .digest('hex');
+  const input: Record<string, unknown> = {
+    // Jira renderer 2 moved read-only custom fields under `readonly` and dropped excluded ones.
+    // Confluence renders as before, so its hash input must stay byte-identical.
+    renderer: product === 'jira' ? 2 : 1,
+    product,
+    comments,
+    aliases: Object.entries(fields?.aliases ?? {}).sort(byKey),
+  };
+  if (product === 'jira') {
+    input['settings'] = Object.entries(fields?.settings ?? {})
+      .sort(byKey)
+      .map(([id, settings]) => [id, Object.entries(settings).sort(byKey)]);
+  }
+  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
 }
 
 type ActiveExport = ExportManifest & {

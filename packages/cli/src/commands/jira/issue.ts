@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 import { LassiError, displayPath, parseSince, resolvePath } from '@wonna/lassi-core';
 import {
   changelogFieldNames,
+  CUSTOM_FIELD_ID,
   changelogNeedsFieldNames,
   flattenChangelog,
   wikiToMarkdown,
@@ -20,6 +21,7 @@ import {
   renderFieldMetaTable,
 } from './shared.js';
 import { registerIssueComponent } from './component.js';
+import { fetchCreatemeta } from './createmeta.js';
 import { fetchEditmeta } from './editmeta.js';
 import { registerIssueExport } from './export.js';
 import { resolveIssueKey } from './issue-key.js';
@@ -35,23 +37,30 @@ import {
 } from './workfile.js';
 
 /** The `--axi` view of an issue: editable keys, read-only facts and counts in one flat object. */
-function issueSummary(doc: IssueDocument): Record<string, unknown> {
+function issueSummary(
+  doc: IssueDocument,
+  aliases: Record<string, string>
+): Record<string, unknown> {
   const { readonly, counts, lassi: _lassi, ...rest } = doc.frontmatter;
-  const editable = Object.fromEntries(
-    Object.entries(rest).filter(([k]) => !/^customfield_\d+$/.test(k))
-  );
-  return { ...editable, ...readonly, counts };
+  // Unaliased custom fields are noise in a summary; aliased ones, even an alias spelled as the raw
+  // id, are there because someone asked.
+  const named = (entries: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(entries).filter(([k]) => !CUSTOM_FIELD_ID.test(k) || Object.hasOwn(aliases, k))
+    );
+  return { ...named(rest), ...named(readonly), counts };
 }
 
 function issueAxi(
   doc: IssueDocument,
   issue: JiraIssue,
-  expansion: Expansion
+  expansion: Expansion,
+  aliases: Record<string, string>
 ): Record<string, unknown> {
   // A top-level key so a next step can name the resolved issue rather than the `.` the user typed.
   const out: Record<string, unknown> = {
     key: doc.frontmatter.key,
-    issue: issueSummary(doc),
+    issue: issueSummary(doc, aliases),
     description: doc.description,
   };
   const counts = doc.frontmatter.counts;
@@ -201,7 +210,7 @@ export function registerIssue(issue: Command, deps: CliDeps, session: Session): 
           issue: fetched,
           commentCoverage: commentCoverage(fetched, expansion.comments),
         },
-        axi: { data: issueAxi(doc, fetched, expansion) },
+        axi: { data: issueAxi(doc, fetched, expansion, aliasesOf(ctx)) },
       };
     },
   });
@@ -269,18 +278,13 @@ export function registerIssue(issue: Command, deps: CliDeps, session: Session): 
 
   const createmeta = issue
     .command('createmeta <PROJECT>')
-    .description('issue types and their fields (required flags, allowed values, aliases)')
+    .description('fetch issue types and fields live; refresh the 24-hour create metadata cache')
     .option('--type <T>', 'only this issue type');
   attach<[string], { type?: string }>(createmeta, deps, session, {
     kind: 'read',
     async run(ctx, [project], opts) {
       const client = await jiraClient(ctx);
-      if (!opts.type) {
-        ctx.logger.warn(
-          `fetching field metadata for every issue type in ${project}; pass --type to narrow`
-        );
-      }
-      const meta = await client.createmeta(project, opts.type);
+      const meta = await fetchCreatemeta(ctx, client, project, opts.type);
       const aliases = aliasesOf(ctx);
       const parts = meta.issueTypes.map(
         (t) =>

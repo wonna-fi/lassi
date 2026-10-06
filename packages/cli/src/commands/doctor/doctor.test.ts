@@ -247,6 +247,55 @@ describe('doctor', () => {
     expect(rows.find((r) => r.name === 'alias bogus')?.status).toBe('WARN');
   });
 
+  it('checks the field policy without asking Jira', async () => {
+    const withFields = (fields: unknown) => ({
+      files: { '/home/u/proj/.lassi.json': JSON.stringify({ jira: { fields } }) },
+    });
+    const shorthand = await doctor(withFields({ team: 'customfield_10001', due: 'duedate' }));
+    expect(shorthand.rows.find((r) => r.name === 'Jira field policy')).toEqual({
+      name: 'Jira field policy',
+      status: 'WARN',
+      detail: 'custom fields are read-only unless marked editable, including team',
+      hint: 'to keep editing one, write e.g. "team": { "id": "customfield_10001", "editable": true }; write "team": { "id": "customfield_10001" } to keep it read-only',
+    });
+    expect(shorthand.rows.find((r) => r.name === 'Jira field aliases')?.status).toBe('SKIP');
+
+    // Another entry for the same field states the choice, so the string alias is not a surprise.
+    const stated = await doctor(
+      withFields({
+        team: 'customfield_10001',
+        teamEdit: { id: 'customfield_10001', editable: true },
+        points: 'customfield_10005',
+        pointsFixed: { id: 'customfield_10005', editable: false },
+      })
+    );
+    expect(stated.rows.find((r) => r.name === 'Jira field policy')).toMatchObject({
+      status: 'PASS',
+      detail: '1 editable, 1 read-only, 0 excluded',
+    });
+
+    const objects = await doctor(
+      withFields({
+        team: { id: 'customfield_10001', editable: true },
+        points: { id: 'customfield_10005' },
+        development: { id: 'customfield_10040', exclude: true },
+        due: 'duedate',
+      })
+    );
+    expect(objects.rows.find((r) => r.name === 'Jira field policy')).toMatchObject({
+      status: 'PASS',
+      detail: '2 editable, 1 read-only, 1 excluded',
+    });
+
+    const invalid = await doctor(withFields({ summary: 'customfield_10001' }));
+    expect(invalid.rows.find((r) => r.name === 'Jira field policy')).toMatchObject({
+      status: 'FAIL',
+      detail:
+        'invalid jira.fields: "summary" is a built-in frontmatter key; choose another alias for customfield_10001',
+    });
+    expect(invalid.code).not.toBe(0);
+  });
+
   it('checks build freshness from mtimes (pure)', () => {
     expect(staleBuildStatus(undefined, undefined)).toMatchObject({
       status: 'WARN',

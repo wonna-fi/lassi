@@ -13,9 +13,9 @@ import { guardWrite } from '../../guard-write.js';
 import { dryRunData } from '../../output/dry-run.js';
 import { renderTable } from '../../output/table.js';
 import { attach, type Session } from '../../run-command.js';
-import { markdownBodyToWiki } from './body.js';
+import { markdownBodyToWiki, takesMarkdown } from './body.js';
 import { resolveIssueKey } from './issue-key.js';
-import { aliasesOf, group, jiraClient } from './shared.js';
+import { aliasesOf, fieldPolicyOf, group, jiraClient } from './shared.js';
 
 interface DoOptions {
   field: string[];
@@ -79,7 +79,8 @@ export function registerTransition(issue: Command, deps: CliDeps, session: Sessi
     async run(ctx, [keyArg, nameOrId], opts) {
       const key = await resolveIssueKey(ctx, keyArg);
       const client = await jiraClient(ctx);
-      const aliases = aliasesOf(ctx);
+      const policy = fieldPolicyOf(ctx);
+      const aliases = policy.aliases;
       const chosen = resolveTransition(await client.listTransitions(key), nameOrId, key);
       const context: HintContext = {
         product: 'jira',
@@ -99,7 +100,9 @@ export function registerTransition(issue: Command, deps: CliDeps, session: Sessi
           });
         }
         try {
-          fields[id] = coerceFieldValue(raw, chosen.fields[id], id);
+          fields[id] = takesMarkdown(policy, id, raw)
+            ? await markdownBodyToWiki(ctx, client, raw, { field: name })
+            : coerceFieldValue(raw, chosen.fields[id], id);
         } catch (err) {
           if (isLassiError(err)) err.context = { ...context, ...err.context };
           throw err;

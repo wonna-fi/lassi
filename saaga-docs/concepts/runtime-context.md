@@ -1,7 +1,7 @@
 ---
 title: Runtime Context
 type: concept
-last_verified: 2026-09-29
+last_verified: 2026-10-03
 sources:
   - packages/core/src/http/save.ts
   - packages/core/src/index.ts
@@ -31,7 +31,7 @@ The runtime context is the per-command view of configuration and host capabiliti
 
 Effective precedence is defaults, global file, workspace file, environment, then flags. Layers merge by dotted leaf path, so a later partial object does not erase unrelated earlier fields. `LoadedConfig.sources` records the winning source for every effective leaf.
 
-Workspace configuration is treated as untrusted repository input. Its allow-list permits team-facing Jira fields, templates, output, attachment, HTTP, and selected embedding settings, but excludes service URLs, inline `jira.token`, `confluence.token`, and `embeddings.apiKey`, credential-file paths, authentication modes, warning suppression, and shared export/index roots. The inline values could override a user's token file and select a different identity for requests. Workspace template files must remain inside the workspace config directory after symlink resolution, use a Markdown extension, avoid `.git`, and not resolve to a credential file.
+Workspace configuration is treated as untrusted repository input. Its allow-list permits team-facing Jira fields, including policy objects, templates, output, attachment, HTTP, and selected embedding settings, but excludes service URLs, inline `jira.token`, `confluence.token`, and `embeddings.apiKey`, credential-file paths, authentication modes, warning suppression, and shared export/index roots. The inline values could override a user's token file and select a different identity for requests. Workspace template files must remain inside the workspace config directory after symlink resolution, use a Markdown extension, avoid `.git`, and not resolve to a credential file.
 
 Shared `storage.exportDir` and `storage.indexDir` paths resolve relative to the global config file or home directory, never the current workspace. The local `workspaceStateDir` is always `<cwd>/.lassi`.
 
@@ -48,7 +48,7 @@ Shared `storage.exportDir` and `storage.indexDir` paths resolve relative to the 
 
 | Object/Model/Type | Field/Property | Purpose |
 |--------|-------|---------|
-| `LassiConfig` | `jira`, `confluence` | Product URL, token source, defaults, and product-specific settings. |
+| `LassiConfig` | `jira`, `confluence` | Product URL, token source, defaults, and product-specific settings; `jira.fields` accepts strings or strict policy objects. |
 | `LassiConfig` | `output` | Selects JSON, AXI, or default Markdown rendering. |
 | `LassiConfig` | `attachments`, `storage` | Controls local attachment limits and stable export/index roots. |
 | `LassiConfig` | `http` | Sets the default request timeout, which a known-slow request may raise for itself, and total retry attempts. |
@@ -75,7 +75,7 @@ The schema enforces these cross-field constraints after layering:
 | A Jira template sets both `description` and `descriptionFile` | Loading fails because the description source is ambiguous. |
 | A Jira template name contains characters outside letters, digits, `-`, and `_` | Loading fails with the naming rule. |
 
-Configuration URLs must use HTTP or HTTPS and are normalized without trailing slashes. Numeric settings validate their operational bounds: HTTP timeout and attachment size are positive, retries are between one and ten total attempts, embedding batch size is at most 2048, and query score is below one.
+Configuration URLs must use HTTP or HTTPS and are normalized without trailing slashes. Numeric settings validate their operational bounds: HTTP timeout and attachment size are positive, retries are between one and ten total attempts, embedding batch size is at most 2048, and query score is below one. The schema validates each `jira.fields` entry as a string ID or a strict object with `id` and optional `editable`, `format`, and `exclude` settings; [Jira Domain](./jira-domain.md) defines their meaning and cross-entry checks.
 
 Product token-file paths and embedding key-file paths expand a leading home marker. Template description paths are resolved relative to the configuration file that supplied that leaf, allowing a versioned workspace config to refer to a sibling Markdown template independently of the command's current subdirectory.
 
@@ -104,7 +104,7 @@ Product clients expose the product, normalized base URL, authenticated HTTP clie
 The context reads `LASSI_READ_ONLY` separately from schema configuration because it is a runtime safety control, not a persistent leaf. Its enforcement belongs to [Command Execution](../features/command-execution.md).
 Configuration loading similarly treats `LASSI_CONFIG` as a file selector rather than an effective configuration leaf.
 
-## Key services and functions
+## Key Services/Functions (PUBLIC/EXPORTED only)
 
 | Module | Function/Method | Purpose |
 |---------|--------|---------|

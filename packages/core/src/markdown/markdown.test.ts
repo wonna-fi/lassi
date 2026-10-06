@@ -171,6 +171,15 @@ describe('frontmatter', () => {
     expect(splitFrontmatter(text).data).toEqual({ customfield_10001: 3, summary: 'S' });
   });
 
+  it('renders trailing comments on nested keys named by a dotted path', () => {
+    const data = { summary: 'S', readonly: { id: '1', customfield_10001: 3 } };
+    const text = joinFrontmatter(data, 'b', {
+      comments: { 'readonly.customfield_10001': 'Story Points' },
+    });
+    expect(text).toContain('readonly:\n  id: "1"\n  customfield_10001: 3 # Story Points\n');
+    expect(splitFrontmatter(text).data).toEqual(data);
+  });
+
   it('keeps timestamps as strings and quotes ambiguous scalars', () => {
     const text = joinFrontmatter({ summary: '123', flag: 'true', when: '2026-01-01' }, '');
     expect(splitFrontmatter(text).data).toEqual({

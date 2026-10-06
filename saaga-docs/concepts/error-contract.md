@@ -1,7 +1,7 @@
 ---
 title: Error Contract
 type: concept
-last_verified: 2026-09-29
+last_verified: 2026-10-06
 sources:
   - packages/cli/src/commands/search/index.ts
   - packages/cli/src/commands/skills/install.ts
@@ -14,7 +14,9 @@ sources:
   - packages/cli/src/run.ts
   - packages/cli/src/context.ts
   - packages/cli/src/commands/jira/export.ts
+  - packages/cli/src/commands/jira/issue-write.ts
   - packages/cli/src/commands/confluence/export.ts
+  - packages/jira/src/fields/policy.ts
 ---
 
 # Error Contract
@@ -51,7 +53,7 @@ A nonempty successful response from a JSON API method must contain valid JSON. A
 
 Atlassian response bodies retain useful structured detail. Jira `errors` and `errorMessages`, Confluence `message`, and nested Confluence error translations are copied into the envelope; short unstructured response bodies or status text provide the fallback message.
 
-## Key services and functions
+## Key Services/Functions (PUBLIC/EXPORTED only)
 
 | Module | Function/Method | Purpose |
 |---------|--------|---------|
@@ -67,9 +69,9 @@ Atlassian response bodies retain useful structured detail. Jira `errors` and `er
 | `@wonna/lassi-core` | `createRedactor()` | Replaces every known secret of at least four characters with `***`. |
 | `packages/cli/src/run-command.ts` | `enrichError()` | Adds config-derived aliases, token-file context, and a catalogue hint. |
 
-The hint catalogue is ordered and first-match wins. It covers read-only recovery; credential, TLS, timeout, and network checks, with a separate timeout hint for slow Jira edit metadata; conflict refetch commands; Jira metadata commands for invalid fields and transitions, including refreshing cached allowed values; Confluence validation; and product-specific not-found lookup suggestions. A hint supplied by the thrower takes precedence.
+The hint catalogue is ordered and first-match wins. It covers read-only recovery; credential, TLS, timeout, and network checks, with separate timeout hints for Jira create and edit metadata; conflict refetch commands; Jira metadata commands for invalid fields and transitions, including refreshing cached values; Confluence validation; and product-specific not-found lookup suggestions. A hint supplied by the thrower takes precedence. The create-metadata timeout hint suggests a type-scoped warm-up or a higher configured timeout only when the request path is for create metadata.
 
-`HintContext` is deliberately facts rather than prose. Throwers can supply product, issue or page identity, project and issue type, working and credential file paths, aliases, version movement, allowed values, transition state, and operation kind. The CLI adds facts available only after configuration, such as when the allowed values a Jira update checked were cached. The catalogue then turns them into a concrete command or remediation.
+`HintContext` is deliberately facts rather than prose. Throwers can supply product, issue or page identity, project and issue type, working and credential file paths, aliases, version movement, allowed values, transition state, and operation kind. The CLI adds `allowedValuesCachedAt` for values checked from cache. `editmetaCachedAt` marks a cached edit-screen refusal; `createmetaCachedAt` marks cached create validation and selects `jira issue createmeta PROJECT --type TYPE` before the generic Jira validation hint. Live create validation has no cache timestamp and receives the generic hint. The catalogue turns these facts into a concrete command or remediation; command behavior is in [Jira Issue Workflows](../features/jira-issue-workflows.md), and cache validity is in [Jira Domain](./jira-domain.md).
 
 The error envelope keeps raw service information and convenience information separate:
 
@@ -77,6 +79,7 @@ The error envelope keeps raw service information and convenience information sep
 |-------------|-------------------|
 | Jira field IDs | Remain unchanged in `errors`. |
 | Configured Jira aliases | Appear additionally in `errorsByAlias`; the raw map is not rewritten. |
+| Read-only Jira policy refusal | Uses `usage`, retains field IDs in `errors`, and enriches configured names through `errorsByAlias`; [Jira Domain](./jira-domain.md) owns the policy. |
 | Jira `errorMessages` | Remain an ordered string list. |
 | Confluence nested messages | Flatten to `errorMessages`, preferring translation text over message keys. |
 | Request reference | Contains method and relative path/query only. |
@@ -95,8 +98,6 @@ The logger has `silent`, `error`, `warn`, `info`, and `debug` thresholds and emi
 Cancellation is represented with the `timeout` category to preserve the exit-code table, but its message says `request cancelled` and its explicit hint identifies the caller signal. Internal deadlines instead say the request timed out and can include the effective deadline, which a request may raise above the configured timeout.
 
 Consumers may return a `LassiError` after emitting successful batch items. The command wrapper still renders the same envelope and nonzero category exit, so partial success does not create a second failure protocol.
-
-The JSON envelope omits absent optional fields rather than emitting nulls. This keeps local usage failures compact while preserving remote detail when available.
 
 Errors created before a context exists cannot use its accumulated secret set. Top-level parsing therefore renders only argument text supplied by Commander, while command and service failures use the context redactor.
 

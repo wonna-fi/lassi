@@ -24,6 +24,15 @@ export function jiraEditmetaCachePath(
   return pathApi(dirs.cache).join(dirs.cache, 'jira', 'editmeta', name);
 }
 
+export function jiraCreatemetaCachePath(dirs: LassiDirs, project: string): string {
+  return pathApi(dirs.cache).join(
+    dirs.cache,
+    'jira',
+    'createmeta',
+    `${serverProjectKey(project)}.json`
+  );
+}
+
 export function confluenceCachePath(dirs: LassiDirs, id: string, version: number): string {
   const name = `${serverContentId(id)}.v${Math.trunc(version)}.xml`;
   return pathApi(dirs.cache).join(dirs.cache, 'confluence', name);

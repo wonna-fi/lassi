@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import type { Route } from '@wonna/lassi-core/testing';
+import { fieldPolicy } from '@wonna/lassi-jira';
 import { describe, expect, it } from 'vitest';
 import { BOTH_PRODUCTS_ENV, makeTestProgram } from '../../test/program.js';
 import { exportRenderHash } from './export-manifest.js';
@@ -67,8 +69,66 @@ describe('export archive coverage', () => {
       JSON.stringify({ jira: { fields: { team: 'customfield_10001' } } })
     );
     expect(await p.run([...args, '--comments'])).toBe(0);
-    expect(await p.fs.readFile(`${dir}/PROJ-1.md`)).toContain('team: Platform');
-    expect((await manifest()).items['PROJ-1'].renderHash).not.toBe(first);
+    expect(await p.fs.readFile(`${dir}/PROJ-1.md`)).toContain('\n  team: Platform\n');
+    const second = (await manifest()).items['PROJ-1'].renderHash;
+    expect(second).not.toBe(first);
+
+    // Making the field editable moves it out of `readonly`, so the archive must render again.
+    await p.fs.writeFile(
+      '/home/u/proj/.lassi.json',
+      JSON.stringify({ jira: { fields: { team: { id: 'customfield_10001', editable: true } } } })
+    );
+    expect(await p.run([...args, '--comments'])).toBe(0);
+    expect(await p.fs.readFile(`${dir}/PROJ-1.md`)).toContain('\nteam: Platform\n');
+    expect((await manifest()).items['PROJ-1'].renderHash).not.toBe(second);
+  });
+
+  it('keeps an excluded volatile field out of re-rendered archives', async () => {
+    let reads = 0;
+    let summary = 'Login fails';
+    const routes: Route[] = [
+      {
+        path: '/rest/api/2/search',
+        handler: () => {
+          reads += 1;
+          const one = issue('PROJ-1');
+          return {
+            json: {
+              issues: [
+                {
+                  ...one,
+                  fields: {
+                    ...one.fields,
+                    summary,
+                    updated: summary === 'Login fails' ? '2026-09-01' : '2026-09-02',
+                    // Fabricated: a plugin value whose object hash differs on every read.
+                    customfield_10040: `{summaryBean=example.SummaryBean@${reads.toString(16)}a1}`,
+                  },
+                },
+              ],
+              startAt: 0,
+              maxResults: 100,
+              total: 1,
+            },
+          };
+        },
+      },
+    ];
+    const p = makeTestProgram({ env: { ...BOTH_PRODUCTS_ENV }, routes });
+    await p.fs.writeFile(
+      '/home/u/proj/.lassi.json',
+      JSON.stringify({
+        jira: { fields: { development: { id: 'customfield_10040', exclude: true } } },
+      })
+    );
+    expect(await p.run(args)).toBe(0);
+    const before = await p.fs.readFile(`${dir}/PROJ-1.md`);
+    expect(before).not.toContain('summaryBean');
+    summary = 'Login fails on empty password';
+    expect(await p.run(args)).toBe(0);
+    const after = await p.fs.readFile(`${dir}/PROJ-1.md`);
+    const changed = after.split('\n').filter((line, i) => line !== before.split('\n')[i]);
+    expect(changed).toEqual(['summary: Login fails on empty password', '  updated: 2026-09-02']);
   });
 
   it('retains an archive without relabeling it as the narrower query snapshot', async () => {
@@ -125,9 +185,35 @@ describe('export archive coverage', () => {
     expect((await s.manifest()).lastRun.complete).toBe(false);
   });
 
-  it('fingerprints aliases independently of property insertion order', () => {
-    expect(exportRenderHash('jira', false, { a: 'x', b: 'y' })).toBe(
-      exportRenderHash('jira', false, { b: 'y', a: 'x' })
+  it('fingerprints the field policy independently of property insertion order', () => {
+    expect(
+      exportRenderHash(
+        'jira',
+        false,
+        fieldPolicy({
+          a: { id: 'customfield_1', editable: true, format: 'wiki' },
+          b: { id: 'customfield_2', exclude: true },
+        })
+      )
+    ).toBe(
+      exportRenderHash(
+        'jira',
+        false,
+        fieldPolicy({
+          b: { exclude: true, id: 'customfield_2' },
+          a: { format: 'wiki', id: 'customfield_1', editable: true },
+        })
+      )
     );
+    expect(exportRenderHash('jira', false, fieldPolicy({ a: 'customfield_1' }))).not.toBe(
+      exportRenderHash('jira', false, fieldPolicy({ a: { id: 'customfield_1', editable: true } }))
+    );
+  });
+
+  it('leaves the Confluence fingerprint as it was, so its archives do not render again', () => {
+    const legacy = createHash('sha256')
+      .update(JSON.stringify({ renderer: 1, product: 'confluence', comments: false, aliases: [] }))
+      .digest('hex');
+    expect(exportRenderHash('confluence', false)).toBe(legacy);
   });
 });

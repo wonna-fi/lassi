@@ -14,6 +14,7 @@ export {
   confluencePageCachePath,
   jiraCachePath,
   jiraEditmetaCachePath,
+  jiraCreatemetaCachePath,
   readJsonCache,
   writeJsonCache,
 } from './cache.js';

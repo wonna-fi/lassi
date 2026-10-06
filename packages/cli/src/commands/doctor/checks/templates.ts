@@ -1,4 +1,4 @@
-import { createJiraClient, fieldIdFor } from '@wonna/lassi-jira';
+import { createJiraClient, fieldAliases, fieldIdFor } from '@wonna/lassi-jira';
 import type { Check, CheckResult } from '../types.js';
 import { productState } from '../types.js';
 
@@ -41,7 +41,7 @@ export const templatesCheck: Check = async (ctx, shared) => {
       }
     }
     for (const key of Object.keys(t.fields)) {
-      const id = fieldIdFor(ctx.config.jira.fields, key);
+      const id = fieldIdFor(fieldAliases(ctx.config.jira.fields), key);
       if (id === undefined) problems.push(`unknown field "${key}"`);
       else if (id === 'description' || id === 'project' || id === 'issuetype')
         problems.push(`"${key}" belongs in the template's type/project/description, not in fields`);

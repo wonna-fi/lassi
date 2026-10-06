@@ -3,6 +3,8 @@ import { LassiError, isLassiError } from '@wonna/lassi-core';
 import {
   aliasFor,
   createJiraClient,
+  fieldPolicy,
+  type FieldPolicy,
   type JiraClient,
   type JiraFieldMeta,
   type JiraFieldMetaMap,
@@ -24,8 +26,20 @@ export function jiraClient(ctx: Context): Promise<JiraClient> {
   return pending;
 }
 
+const policies = new WeakMap<Context, FieldPolicy>();
+
+/** `jira.fields` as aliases and per-field settings; an invalid entry fails the command (exit 2). */
+export function fieldPolicyOf(ctx: Context): FieldPolicy {
+  let policy = policies.get(ctx);
+  if (!policy) {
+    policy = fieldPolicy(ctx.config.jira.fields);
+    policies.set(ctx, policy);
+  }
+  return policy;
+}
+
 export function aliasesOf(ctx: Context): Record<string, string> {
-  return ctx.config.jira.fields;
+  return fieldPolicyOf(ctx).aliases;
 }
 
 /**

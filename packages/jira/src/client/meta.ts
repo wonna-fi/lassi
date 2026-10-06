@@ -52,11 +52,22 @@ export function withIds(fields: Record<string, FieldMetaWithoutId> | undefined):
   return out;
 }
 
-async function drain<T>(http: HttpClient, path: string, context: HintContext): Promise<T[]> {
+const SLOW_METADATA_REQUEST = { minTimeoutMs: 180_000, retryOnTimeout: false };
+
+async function drain<T>(
+  http: HttpClient,
+  path: string,
+  context: HintContext,
+  fields = false
+): Promise<T[]> {
   const out: T[] = [];
   let startAt = 0;
   for (let i = 0; i < 100; i++) {
-    const page = await http.get<Page<T>>(path, { query: { startAt, maxResults: 100 }, context });
+    const page = await http.get<Page<T>>(path, {
+      query: { startAt, maxResults: 100 },
+      context,
+      ...(fields ? SLOW_METADATA_REQUEST : {}),
+    });
     const values = page?.values ?? [];
     out.push(...values);
     startAt += values.length;
@@ -189,6 +200,7 @@ export class CreatemetaResolver {
         ...(issueType ? { issuetypeNames: issueType } : {}),
         ...(withFields ? { expand: 'projects.issuetypes.fields' } : {}),
       },
+      ...(withFields ? SLOW_METADATA_REQUEST : {}),
       context,
     });
     const proj = raw?.projects?.[0];
@@ -251,7 +263,8 @@ export class CreatemetaResolver {
       const fields = await drain<JiraFieldMeta>(
         this.http,
         `${base}/${encodeURIComponent(t.id)}`,
-        context
+        context,
+        true
       );
       const map: JiraFieldMetaMap = {};
       for (const f of fields) map[f.fieldId] = f;

@@ -1,6 +1,7 @@
 ---
 title: "Feature: Jira Wiki Conversion"
 type: feature
+last_verified: 2026-10-03
 sources:
   - packages/jira/package.json
   - packages/jira/src/index.ts
@@ -67,7 +68,7 @@ Before working with this feature, understand these concepts:
 | `WikiSerializeResult` | `wiki`, `warnings` | Returns generated Jira source with fidelity diagnostics. |
 | `WikiWarning` | `code`, `message`, optional `line` | Identifies a specific conversion compromise. |
 
-### Services and functions
+### Services/Functions
 
 | Module | Function/Method | Purpose |
 |---------|--------|---------|
@@ -93,7 +94,7 @@ Property tests additionally exercise serializer stability across generated trees
 ## Integration Points
 
 - **Depends on**: core Markdown parsing/stringification, mdast/GFM node shapes, mention nodes, color nodes, raw fences, and dialect-leak detection.
-- **Used by**: Jira issue descriptions, comments, transition comments, templates, exports, and working-file write-back.
+- **Used by**: Jira issue descriptions, comments, transition comments, templates, exports, configured wiki-format fields, and working-file write-back. [Jira Issue Workflows](./jira-issue-workflows.md) identifies which authored field values take this route.
 - **External systems**: Jira's wiki-rendering contract; conversion itself performs no network or filesystem I/O.
 
 ## Extension Guide

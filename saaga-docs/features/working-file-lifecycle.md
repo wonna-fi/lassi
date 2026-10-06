@@ -14,7 +14,6 @@ sources:
   - packages/cli/src/commands/confluence/{workfile,page-write}.ts
   - packages/jira/src/issue/{frontmatter,cache,diff,document}.ts
   - packages/confluence/src/page/{frontmatter,cache,document}.ts
-last_verified: 2026-09-19
 ---
 
 # Feature: Working File Lifecycle
@@ -36,17 +35,17 @@ Before working with this feature, understand these concepts:
 ### Mechanism
 
 1. A product command fetches an entity and converts its body through the canonical Markdown representation.
-2. It builds editable frontmatter plus `readonly`, `counts`, and schema-1 `lassi` metadata. Requested related content becomes generated sections.
+2. It places Jira fields according to [Jira Domain](../concepts/jira-domain.md), then builds frontmatter, `readonly`, `counts`, and schema-1 `lassi` metadata. Requested related content becomes generated sections.
 3. `writeWorkingFile()` renders YAML and body, returning a SHA-256 content hash.
-4. The command merges a snapshot into the entity cache under the file's displayed workspace-relative path.
+4. The command merges a snapshot, including the file's wiki-rendered field formats, into the entity cache under the file's displayed workspace-relative path.
 5. Update reads the file, checks its entity identity, and requires cache state for that exact path.
 6. Jira compares the live `updated` marker with the cached value only when `--if-unchanged` is set. Confluence always compares the live version with the cached version for a file-based update.
 7. The generated tail is stripped only when unchanged. Generated content is never sent as the editable body.
-8. Product diff logic determines which fields and body to send. Confluence converts a supplied body before comparing it with the cached Markdown. If cached storage is unavailable, it treats the body as changed; see [Confluence Page Workflows](./confluence-page-workflows.md).
+8. Product diff logic determines which fields and body to send. Jira uses the file's recorded formats for conversion and rejects changed nonwritable top-level fields. Confluence converts a supplied body before comparing it with the cached Markdown. If cached storage is unavailable, it treats the body as changed; see [Confluence Page Workflows](./confluence-page-workflows.md).
 9. The command write gate applies read-only and dry-run policy; see [Command Execution](./command-execution.md).
 10. After a successful write, the command normally re-fetches and rewrites the file, preserving which generated sections it included. Jira refreshes an included comments section with all comments. `--keep` skips the refresh.
 
-An export manifest records each server marker, path, content hash, and renderer settings. A later export checks those values and comment completeness before reusing a file. It refuses to overwrite bytes that differ from the baseline. Archive writes use an exclusive lock, and manifests publish by temporary-file rename. For editable work, use `get --out` to keep a separate copy: editing an archive file causes a conflict on the next export.
+An export manifest records each server marker, path, content hash, and renderer settings. The Jira render hash includes field aliases and policy settings, so a changed policy can rerender even when the server marker is unchanged. A later export checks those values and comment completeness before reusing a file. It refuses to overwrite bytes that differ from the baseline. Archive writes use an exclusive lock, and manifests publish by temporary-file rename. For editable work, use `get --out` to keep a separate copy: editing an archive file causes a conflict on the next export.
 
 Working-file refresh is not a transaction. The Markdown file is written before its cache, so a failed cache write can leave new Markdown paired with an older entry for the same path. Jira checks that the entry exists but does not compare a file hash or fetch timestamp with it. A later update can therefore interpret the refreshed content as edits against the old baseline. After a failed refresh, preserve any intended edits separately and fetch a fresh working copy before retrying. Archive locking and atomic manifest replacement do not make the file/cache pair atomic.
 
@@ -58,7 +57,7 @@ Working-file refresh is not a transaction. The Markdown file is written before i
 - Server issue keys and page IDs are validated before naming files.
 - Edited generated sections cause refusal because they are informational.
 - Removing a Jira YAML key warns and preserves the remote value; `null` explicitly clears a supported field.
-- Jira readonly edits are ignored with warnings; unknown editable fields fail without an alias or schema.
+- Jira edits inside `readonly` are ignored with warnings; changed nonwritable top-level fields fail, as do unknown editable fields.
 - Confluence rejects unknown keys and immutable identity/space changes; title and parent are editable.
 - Confluence view HTML is read-only input and cannot be an editable storage baseline.
 - Export never overwrites an untracked file or one whose bytes differ from its manifest baseline.

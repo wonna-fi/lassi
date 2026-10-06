@@ -2,6 +2,8 @@ import { LassiError } from '@wonna/lassi-core';
 import type { JiraFieldMeta, JiraFieldMetaMap, JiraFieldSchema } from '../client/types.js';
 import { fieldIdFor } from '../fields/aliases.js';
 import { AllowedValueMismatch, scalarToApiValue, standardSchema } from '../fields/normalize.js';
+import { assertWritable, type FieldPolicy } from '../fields/policy.js';
+import { markdownToWiki } from '../wiki/index.js';
 import type { IssueCache } from './cache.js';
 
 export interface DiffInput {
@@ -49,6 +51,8 @@ export interface FieldChange {
   value: unknown;
   /** What the fetch recorded or the standard fields define; field metadata, when loaded, wins. */
   schema?: JiraFieldSchema;
+  /** The file shows this field as Markdown; the value goes back to Jira as wiki markup. */
+  wiki?: boolean;
 }
 
 export interface FrontmatterChanges {
@@ -61,16 +65,17 @@ export interface FrontmatterChanges {
  * Compares the edited frontmatter with the cache, without converting anything, so the caller can
  * tell from the changed fields whether their live metadata is needed at all. Deleted keys are
  * ignored with a warning (an accidental deletion must not wipe a field: set the key to `null` to
- * clear it). `readonly` edits are warned about and ignored.
+ * clear it). `readonly` edits are warned about and ignored. A changed key the policy does not let
+ * Lassi write is an error, whether the file put it under `readonly` or not.
  */
 export function frontmatterChanges(
   cache: IssueCache,
   current: DiffInput,
-  aliases: Record<string, string>
+  policy: FieldPolicy
 ): FrontmatterChanges {
   const changes: FieldChange[] = [];
   const warnings: string[] = [];
-  const merged = { ...cache.aliases, ...aliases };
+  const merged = { ...cache.aliases, ...policy.aliases };
 
   for (const [key, value] of Object.entries(current.editable)) {
     if (key === 'key') {
@@ -94,8 +99,15 @@ export function frontmatterChanges(
       );
     }
     const schema = cache.fieldSchema[id] ?? standardSchema(id);
-    changes.push({ key, id, value, ...(schema ? { schema } : {}) });
+    changes.push({
+      key,
+      id,
+      value,
+      ...(schema ? { schema } : {}),
+      ...(cache.formats?.[id] === 'wiki' ? { wiki: true } : {}),
+    });
   }
+  assertWritable(policy, changes, { product: 'jira', issueKey: cache.key, operation: 'update' });
 
   for (const key of Object.keys(cache.editable)) {
     if (!(key in current.editable)) {
@@ -141,16 +153,30 @@ export function fieldChangeToApi(
   }
 }
 
-/** `frontmatterChanges` and `fieldChangeToApi` in one step, for a caller that already has the metadata. */
+/**
+ * `frontmatterChanges` and `fieldChangeToApi` in one step, for a caller that already has the
+ * metadata. A Markdown value of a wiki field goes back as wiki markup, with the converter's warnings;
+ * mention lookup and the pasted-markup check stay with the caller, as for any body.
+ */
 export function frontmatterDiff(
   cache: IssueCache,
   current: DiffInput,
-  aliases: Record<string, string>,
+  policy: FieldPolicy,
   editmeta?: JiraFieldMetaMap
 ): DiffResult {
-  const { changes, descriptionChanged, warnings } = frontmatterChanges(cache, current, aliases);
+  const { changes, descriptionChanged, warnings } = frontmatterChanges(cache, current, policy);
   const fields: Record<string, unknown> = {};
   for (const change of changes) {
+    if (change.wiki && typeof change.value === 'string') {
+      const converted = markdownToWiki(change.value);
+      for (const w of converted.warnings) {
+        warnings.push(
+          `${change.key}: ${w.message}${w.line === undefined ? '' : ` (line ${w.line})`}`
+        );
+      }
+      fields[change.id] = converted.wiki;
+      continue;
+    }
     fields[change.id] = fieldChangeToApi(change, cache.key, editmeta?.[change.id]);
   }
   return { fields, changedKeys: changes.map((c) => c.key), descriptionChanged, warnings };
