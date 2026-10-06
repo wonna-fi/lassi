@@ -12,13 +12,49 @@ const product = {
   tokenFile: z.string().optional(),
 };
 
+const jiraFieldObject = z.strictObject({
+  id: z.string(),
+  /** Custom fields are read-only unless this is true; other fields are writable unless false. */
+  editable: z.boolean().optional(),
+  /** `wiki` shows the value as Markdown and converts it back on update; `raw` leaves it as Jira sends it. */
+  format: z.enum(['raw', 'wiki']).optional(),
+  /** Leaves the field out of working files, issue output and exports. */
+  exclude: z.boolean().optional(),
+});
+
+/** A field id, or the id with its policy. */
+export type JiraFieldEntry = string | z.infer<typeof jiraFieldObject>;
+
+/**
+ * Checked by hand rather than as a union: a union reports only "Invalid input" at the alias, and
+ * the object's own issues (a missing `id`, an unknown `format`) are what tell the user the fix.
+ * A string is kept as written, so `doctor` can still tell the shorthand from the object form.
+ */
+const jiraFieldEntry = z.custom<JiraFieldEntry>().check((ctx) => {
+  const value = ctx.value;
+  if (typeof value === 'string') return;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    ctx.issues.push({
+      code: 'custom',
+      message: 'expected a field id or { "id": "...", "editable": true }',
+      input: value,
+    });
+    return;
+  }
+  const parsed = jiraFieldObject.safeParse(value);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.issues.push({ code: 'custom', message: issue.message, path: issue.path, input: value });
+  }
+});
+
 /** Unknown keys fail fast (exit 2) instead of being silently ignored. */
 export const LassiConfigSchema = z.strictObject({
   jira: z
     .strictObject({
       ...product,
-      /** alias -> field id (workspace file). */
-      fields: z.record(z.string(), z.string()).default({}),
+      /** alias -> field id, or { id, editable, format, exclude } (workspace file). */
+      fields: z.record(z.string(), jiraFieldEntry).default({}),
       defaultProject: z.string().optional(),
       /** Regular expression whose first capture group is the issue key in a branch name (`.` as the key). */
       branchPattern: z.string().optional(),

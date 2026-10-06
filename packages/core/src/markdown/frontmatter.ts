@@ -39,7 +39,7 @@ export function splitFrontmatter(text: string): SplitResult {
 export interface JoinOptions {
   /** Top-level maps rendered inline (`counts: { comments: 7, ... }`), */
   flowKeys?: string[];
-  /** Top-level key → trailing comment (`customfield_10005: 3 # Story Points`). */
+  /** Dotted key path → trailing comment (`readonly.customfield_10005` → `customfield_10005: 3 # Story Points`). */
   comments?: Record<string, string>;
 }
 
@@ -53,8 +53,8 @@ export function joinFrontmatter(
     const node = doc.get(key, true);
     if (isMap(node)) node.flow = true;
   }
-  for (const [key, text] of Object.entries(opts.comments ?? {})) {
-    const node = doc.get(key, true);
+  for (const [path, text] of Object.entries(opts.comments ?? {})) {
+    const node = doc.getIn(path.split('.'), true);
     if (isNode(node)) node.comment = ` ${text}`;
   }
   const yamlText = doc.toString({ lineWidth: 0 });

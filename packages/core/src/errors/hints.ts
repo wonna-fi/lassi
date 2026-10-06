@@ -52,6 +52,11 @@ const RULES: Rule[] = [
     if (e.code !== 'timeout' || !/\/editmeta(\?|$)/.test(e.request?.url ?? '')) return undefined;
     return 'Jira did not finish computing the edit metadata in time; retry when it is less busy, or change only fields that need no allowed values (summary, labels, assignee, description).';
   },
+  (e) => {
+    if (e.code !== 'timeout' || !/\/createmeta(?:\/|\?|$)/.test(e.request?.url ?? ''))
+      return undefined;
+    return 'Jira did not finish computing the create metadata in time; run `lassi jira issue createmeta <PROJECT> --type <TYPE>` when it is less busy to warm the cache, or increase http.timeoutMs in your config.';
+  },
   (e) =>
     e.code === 'timeout'
       ? 'The request timed out; check VPN and proxy settings (NODE_USE_ENV_PROXY=1 when a proxy is required) and run `lassi doctor`.'
@@ -84,12 +89,18 @@ const RULES: Rule[] = [
     }
     if ((operation === 'create' || issueKey === undefined) && project) {
       const type = issueType ? ` --type ${issueType}` : '';
+      if (e.context.createmetaCachedAt !== undefined) {
+        return `The create metadata was cached at ${e.context.createmetaCachedAt}; run \`lassi jira issue createmeta ${project}${type}\` to refresh required fields and allowed values.${allowedValuesNote(e)}`;
+      }
       const fields = aliasedFields(e);
       if (fields.length > 0) {
         const flags = fields.map((f) => `--field ${f}=<value>`).join(' ');
         return `Add ${flags}; run \`lassi jira issue createmeta ${project}${type}\` for allowed values.${allowedValuesNote(e)}`;
       }
       return `Run \`lassi jira issue createmeta ${project}${type}\` to see required fields and allowed values.${allowedValuesNote(e)}`;
+    }
+    if (issueKey && e.context.editmetaCachedAt !== undefined) {
+      return `The edit metadata was cached at ${e.context.editmetaCachedAt}, possibly from another issue of the same project and type; run \`lassi jira issue editmeta ${issueKey}\` to refresh it${aliasNote(e)}.`;
     }
     if (issueKey) {
       const cachedAt = e.context.allowedValuesCachedAt;

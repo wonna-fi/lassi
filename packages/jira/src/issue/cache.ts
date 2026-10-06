@@ -16,6 +16,8 @@ export interface IssueCache {
   aliases: Record<string, string>;
   /** Generated `## Comments` / `## Attachments` / `## Links` text appended to the body, if any. */
   sections?: string;
+  /** Field id → `wiki` for values shown as Markdown; absent in caches written before formats existed. */
+  formats?: Record<string, 'wiki'>;
   /**
    * What each working file was written from, keyed by its path from the workspace root. One issue
    * can have several files at once (`issue get --out`, `issue export`, different `--comments`
@@ -33,6 +35,8 @@ export interface IssueFileState {
   readonly: Record<string, unknown>;
   descriptionMarkdown: string;
   sections: string;
+  /** How this file showed each value; the fetch, not today's config, decides how an edit converts. */
+  formats?: Record<string, 'wiki'>;
 }
 
 /** The per-file snapshot of a freshly built cache, for the CLI to merge under its path. */
@@ -44,6 +48,7 @@ export function issueFileState(cache: IssueCache): IssueFileState {
     readonly: cache.readonly,
     descriptionMarkdown: cache.descriptionMarkdown,
     sections: cache.sections ?? '',
+    formats: cache.formats ?? {},
   };
 }
 
@@ -65,7 +70,8 @@ export function buildIssueCache(
   descriptionMarkdown: string,
   fieldSchema: Record<string, JiraFieldSchema>,
   aliases: Record<string, string>,
-  sections = ''
+  sections = '',
+  formats: Record<string, 'wiki'> = {}
 ): IssueCache {
   const { editable, readonly } = splitFrontmatterKeys(frontmatter);
   return {
@@ -80,5 +86,6 @@ export function buildIssueCache(
     fieldSchema,
     aliases,
     sections,
+    formats,
   };
 }

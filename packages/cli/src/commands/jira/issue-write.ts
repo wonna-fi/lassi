@@ -8,6 +8,7 @@ import {
 } from '@wonna/lassi-core';
 import {
   aliasFor,
+  assertWritable,
   buildCreateIssueFields,
   checkRequiredFields,
   coerceFieldValue,
@@ -36,10 +37,16 @@ import {
   readWorkingFile,
   splitEditable,
 } from '../../workfile/index.js';
-import { markdownBodyToWiki } from './body.js';
-import { EDITMETA_PROBE_FIELDS, loadEditmeta } from './editmeta.js';
+import { markdownBodyToWiki, takesMarkdown } from './body.js';
+import { loadCreatemeta } from './createmeta.js';
+import {
+  cachedEditmeta,
+  EDITMETA_PROBE_FIELDS,
+  loadEditmeta,
+  type LoadedEditmeta,
+} from './editmeta.js';
 import { resolveIssueKey } from './issue-key.js';
-import { aliasesOf, jiraClient } from './shared.js';
+import { fieldPolicyOf, jiraClient } from './shared.js';
 import { templateDescription, templateNamed } from './templates.js';
 import { buildIssueDocument, loadIssueComments, saveIssueWorkingFile } from './workfile.js';
 
@@ -70,6 +77,7 @@ interface PendingField {
   id: string;
   /** Whether converting it consults the field's allowed values or needs a schema it lacks. */
   needsMeta: boolean;
+  /** Async only for Markdown, whose mentions are looked up; runs only for the value that is sent. */
   convert(meta: JiraFieldMeta | undefined): unknown;
 }
 
@@ -85,6 +93,49 @@ function withContext<T>(context: HintContext, run: () => T): T {
     if (isLassiError(err)) err.context = { ...context, ...err.context };
     throw err;
   }
+}
+
+/**
+ * Jira's edit screen has the last word over the config: a field it does not offer, or offers
+ * without `set` (the operation a `fields` update uses), would only come back as a 400.
+ */
+function assertOnEditScreen(
+  editmeta: LoadedEditmeta,
+  fields: ReadonlyArray<{ name: string; id: string }>,
+  context: HintContext
+): void {
+  const reasons = new Map<string, string>();
+  for (const { id } of fields) {
+    const operations = editmeta.fields[id]?.operations;
+    if (editmeta.fields[id] === undefined) reasons.set(id, 'not on the edit screen');
+    else if (operations !== undefined && !operations.includes('set'))
+      reasons.set(id, `cannot be set (operations: ${operations.join(', ') || 'none'})`);
+  }
+  if (reasons.size === 0) return;
+  const issueKey = context.issueKey ?? '';
+  const errors = Object.fromEntries(reasons);
+  if (Object.keys(editmeta.fields).length === 0) {
+    throw new LassiError(
+      'validation',
+      `Jira lists no editable fields for ${issueKey}; its status or your permissions forbid editing`,
+      {
+        errors,
+        hint: `check the status with \`lassi jira issue get ${issueKey}\` and that you may edit it in Jira`,
+        context,
+      }
+    );
+  }
+  const refused = fields
+    .filter(({ id }) => reasons.has(id))
+    .map(({ name, id }) => (name === id ? id : `${name} (${id})`));
+  throw new LassiError(
+    'validation',
+    `Jira does not let ${issueKey} be updated through ${refused.join(', ')}: ${[...new Set(reasons.values())].join('; ')}`,
+    {
+      errors,
+      context: { ...context, ...(editmeta.cached ? { editmetaCachedAt: editmeta.fetchedAt } : {}) },
+    }
+  );
 }
 
 function fieldId(
@@ -106,7 +157,7 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
   const create = issue
     .command('create')
     .description(
-      'create an issue from fields and a markdown description; createmeta runs first and missing required fields fail fast'
+      'create an issue from fields and markdown; validate with create metadata cached for 24 hours'
     )
     .option('--template <name>', 'defaults from jira.templates.<name>; flags win')
     .option('--project <P>', 'project key (default: jira.defaultProject)')
@@ -147,7 +198,8 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
           ? undefined
           : await templateDescription(deps, template.name, template));
       const client = await jiraClient(ctx);
-      const aliases = aliasesOf(ctx);
+      const policy = fieldPolicyOf(ctx);
+      const aliases = policy.aliases;
       const fieldArgs = [
         ...Object.entries(template?.fields ?? {}).map(([k, v]) => ({
           arg: `${k}=${String(v)}`,
@@ -167,7 +219,8 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
         byId.set(id, { key, raw, fromTemplate, id });
       }
       const given = [...byId.values()];
-      const meta = await client.createmeta(project, type);
+      const { meta, cachedAt } = await loadCreatemeta(ctx, client, project, type);
+      if (cachedAt !== undefined) context.createmetaCachedAt = cachedAt;
       const typeMeta = meta.issueTypes[0];
       if (!typeMeta) {
         throw new LassiError('validation', `issue type "${type}" is not available in ${project}`, {
@@ -188,9 +241,11 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
             `use --body/--file, --project and --type instead of --field ${field.key}`
           );
         }
-        custom[field.id] = withContext(context, () =>
-          coerceFieldValue(field.raw, typeMeta.fields[field.id], field.id)
-        );
+        custom[field.id] = takesMarkdown(policy, field.id, field.raw)
+          ? await markdownBodyToWiki(ctx, client, field.raw, { field: field.key })
+          : withContext(context, () =>
+              coerceFieldValue(field.raw, typeMeta.fields[field.id], field.id)
+            );
       }
       if (summary === undefined || summary.trim() === '') {
         throw new LassiError('usage', '--summary is required');
@@ -267,7 +322,8 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
       }
       const context: HintContext = { product: 'jira', issueKey: key, operation: 'update' };
       const client = await jiraClient(ctx);
-      const aliases = aliasesOf(ctx);
+      const policy = fieldPolicyOf(ctx);
+      const aliases = policy.aliases;
       // Keyed by field id: a later --field replaces a file change or an earlier flag, and only the
       // value that is sent decides whether edit metadata is needed.
       const pending = new Map<string, PendingField>();
@@ -315,7 +371,8 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
             }
           );
         }
-        cache = { ...stored, ...state };
+        // The file's own formats: the entity-level ones may come from a later fetch to another path.
+        cache = { ...stored, ...state, formats: state.formats ?? {} };
         if (opts.ifUnchanged) {
           // The same request names the edit-metadata cache, should a changed field need it.
           const live = await client.getIssue(key, {
@@ -350,17 +407,26 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
               ...(split.readonly ? { readonly: split.readonly } : {}),
               body: description,
             },
-            aliases
+            policy
           )
         );
         for (const warning of diff.warnings) ctx.logger.warn(warning);
         for (const change of diff.changes) {
+          const { value } = change;
+          if (change.wiki && typeof value === 'string') {
+            pending.set(change.id, {
+              name: change.key,
+              id: change.id,
+              needsMeta: false,
+              convert: () => markdownBodyToWiki(ctx, client, value, { field: change.key }),
+            });
+            continue;
+          }
           pending.set(change.id, {
             name: change.key,
             id: change.id,
             // null clears and a mapping is sent verbatim; neither is checked against anything.
-            needsMeta:
-              change.value !== null && !isRecord(change.value) && needsFieldMeta(change.schema),
+            needsMeta: value !== null && !isRecord(value) && needsFieldMeta(change.schema),
             convert: (meta) =>
               withContext(fileContext, () => fieldChangeToApi(change, cached.key, meta)),
           });
@@ -369,11 +435,25 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
       }
 
       if (opts.body !== undefined) descriptionMarkdown = opts.body;
-      for (const arg of opts.field) {
+      const flags = opts.field.map((arg) => {
         const { key: name, raw } = parseFieldArg(arg);
         const id = fieldId(aliases, name, context, `lassi jira issue editmeta ${key}`);
         if (id === 'description') {
           throw new LassiError('usage', 'use --body (markdown) to change the description');
+        }
+        return { key: name, id, raw };
+      });
+      // The same policy as a file edit, so neither route can write what the other refuses.
+      assertWritable(policy, flags, context);
+      for (const { key: name, id, raw } of flags) {
+        if (takesMarkdown(policy, id, raw)) {
+          pending.set(id, {
+            name,
+            id,
+            needsMeta: false,
+            convert: () => markdownBodyToWiki(ctx, client, raw, { field: name }),
+          });
+          continue;
         }
         const schema = standardSchema(id);
         pending.set(id, {
@@ -384,22 +464,40 @@ export function registerIssueWrites(issue: Command, deps: CliDeps, session: Sess
             withContext(context, () => coerceFieldValue(raw, meta, id, meta?.schema ?? schema)),
         });
       }
+      if (pending.size === 0 && descriptionMarkdown === undefined) {
+        return { markdown: `no changes for ${key}\n`, data: { key, changed: [] } };
+      }
 
       // Edit metadata can take Jira minutes to compute, so it is loaded only when a changed field
-      // is checked against its allowed values, and then from the cache when it can be.
+      // is checked against its allowed values, and then from the cache when it can be. A fresh
+      // cache entry the --if-unchanged probe can find costs nothing and still vetoes.
       const needed = [...pending.values()].filter((p) => p.needsMeta);
       const editmeta =
-        needed.length === 0
-          ? undefined
-          : await loadEditmeta(ctx, client, key, {
+        needed.length > 0
+          ? await loadEditmeta(ctx, client, key, {
               fieldNames: [...new Set(needed.map((p) => p.name))],
               ...(probe ? { probe } : {}),
-            });
+            })
+          : probe
+            ? await cachedEditmeta(ctx, client, probe)
+            : undefined;
+      if (editmeta) {
+        assertOnEditScreen(
+          editmeta,
+          [
+            ...pending.values(),
+            ...(descriptionMarkdown === undefined
+              ? []
+              : [{ name: 'description', id: 'description' }]),
+          ],
+          context
+        );
+      }
       const fields: Record<string, unknown> = {};
       const changed: string[] = [];
       for (const field of pending.values()) {
         try {
-          fields[field.id] = field.convert(editmeta?.fields[field.id]);
+          fields[field.id] = await field.convert(editmeta?.fields[field.id]);
         } catch (err) {
           if (editmeta?.cached && isLassiError(err) && err.code === 'validation') {
             err.context = { ...err.context, allowedValuesCachedAt: editmeta.fetchedAt };

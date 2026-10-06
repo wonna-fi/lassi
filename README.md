@@ -60,6 +60,62 @@ lassi config show --json
 lassi doctor
 ```
 
+### Jira field policy
+
+`jira.fields` maps local aliases to Jira field ids. An entry is either the id or an object that
+also says what Lassi may do with the field:
+
+```json
+{
+  "jira": {
+    "fields": {
+      "storyPoints": "customfield_10005",
+      "team": { "id": "customfield_10030", "editable": true },
+      "lastComment": { "id": "customfield_10020", "format": "wiki" },
+      "development": { "id": "customfield_10040", "exclude": true }
+    }
+  }
+}
+```
+
+- `editable`: custom fields are read-only unless their entry says `true`. Other fields stay
+  writable unless an entry says `false`. The setting belongs to the field, so it applies to the
+  alias and to the raw `customfield_N` id alike, in working files and in `issue update --field`.
+  Read-only and unaliased custom fields appear under `readonly` in working files.
+- `format`: `raw` (default) leaves the value as Jira sends it. `wiki` shows Jira wiki markup as
+  Markdown and converts an edit back, like the description.
+- `exclude`: leaves the field out of working files, issue output and exports, for example a value
+  that changes on every read. `--json` still carries Jira's raw `issue` object.
+
+The fields behind the fixed frontmatter keys (`summary`, `type`, `priority`, `assignee`, `labels`,
+`components`, `fixVersions`), the `readonly` facts (`status`, `reporter`, `created`, `updated`,
+`resolution`) and the description take no settings. Entries merge by setting across
+the global and workspace files, so a workspace can change `editable` without repeating `id`; an
+object that replaces a string alias must name its `id`. `lassi jira fields` shows the policy, and
+`lassi jira issue update` also refuses a field the issue's edit metadata does not offer, when that
+metadata is already loaded.
+
+### Jira metadata cache
+
+Issue creation caches required fields and allowed values for 24 hours per Jira server, project
+and issue type. Warm or refresh that cache before creating issues on a slow instance:
+
+```sh
+lassi jira issue createmeta PROJ --type Bug
+# Warm every issue type in the project:
+lassi jira issue createmeta PROJ
+```
+
+These commands always fetch live metadata. Subsequent `jira issue create` commands in the same
+working directory reuse it, including `--dry-run`. Cache files live in
+`.lassi/cache/jira/createmeta/`. Expired, damaged or mismatched entries are fetched again; cache
+failures warn and leave the command usable. Refresh after changing Jira's create screen or field
+options. The first fetch can still take minutes; each field-metadata request gets at least three
+minutes, or the configured `http.timeoutMs` when longer, without repeating a timed-out request.
+
+For updates, `lassi jira issue editmeta PROJ-123` refreshes the separate edit metadata cache for
+that issue's project and type, also valid for 24 hours.
+
 ## Agent skills
 
 After configuring Jira, preview and install the global Jira skill:

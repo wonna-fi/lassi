@@ -15,8 +15,8 @@ definition verbatim — to change one, change the INDEX row it comes from.
 - [Confluence Storage Conversion](./features/confluence-storage-conversion.md) — Loss-aware storage/view HTML and Markdown conversion with inferred writer forms and fidelity checks.
 - [Error Contract](./concepts/error-contract.md) — Structured failure categories, envelopes, hints, redaction, and process exit codes.
 - [Injected I/O and HTTP](./patterns/injected-io-and-http.md) — Build deterministic, safe filesystem and HTTP code from injected capabilities.
-- [Jira Domain](./concepts/jira-domain.md) — Jira issue identity, project components and versions, fields, comments, links, transitions, history, and client APIs.
-- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and safely update Jira issues, components, fix versions, and related activity.
+- [Jira Domain](./concepts/jira-domain.md) — Jira field policy, create and edit metadata caches, issue identity, project catalogs, related records, and client APIs.
+- [Jira Issue Workflows](./features/jira-issue-workflows.md) — Read, export, create, and update Jira issues with metadata refresh, field checks, conversion, and related activity.
 - [Jira Wiki Conversion](./features/jira-wiki-conversion.md) — Bidirectional Jira wiki and Markdown conversion with explicit fidelity warnings.
 - [Loss-Aware Conversion](./patterns/loss-aware-conversion.md) — Convert rich-text dialects through mdast with deterministic normalization, passthrough, and explicit warnings.
 - [Markdown Document](./concepts/markdown-document.md) — Canonical mdast and Markdown representation, frontmatter, mentions, and loss-preserving dialect fences.
@@ -27,5 +27,5 @@ definition verbatim — to change one, change the INDEX row it comes from.
 - [Skill Installation](./features/skill-installation.md) — Safely install and refresh Jira and Confluence agent skill assets.
 - [Tests and Fixtures](./conventions/tests-and-fixtures.md) — Colocation, isolation, and fixture-layout rules for automated tests.
 - [TypeScript Modules](./conventions/typescript-modules.md) — ESM import, package export, and type-only import rules for TypeScript modules.
-- [Working File](./concepts/working-file.md) — Editable fields, reserved metadata, cache identity, and local or server drift state.
-- [Working File Lifecycle](./features/working-file-lifecycle.md) — Export, edit, diff, validate, write, and refresh path-specific working snapshots safely.
+- [Working File](./concepts/working-file.md) — Editable and readonly fields, per-path format snapshots, cache identity, and local or server drift state.
+- [Working File Lifecycle](./features/working-file-lifecycle.md) — Export, edit, diff, validate, write, and refresh path-specific working snapshots with format and archive safeguards.

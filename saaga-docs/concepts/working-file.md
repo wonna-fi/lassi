@@ -1,6 +1,7 @@
 ---
 title: Working File
 type: concept
+last_verified: 2026-10-06
 sources:
   - packages/jira/package.json
   - packages/jira/src/index.ts
@@ -14,8 +15,9 @@ sources:
   - packages/core/src/config/schema.ts
   - packages/core/src/config/load.ts
   - packages/jira/src/issue/{frontmatter,cache,diff}.ts
+  - packages/jira/src/fields/policy.ts
+  - packages/core/src/markdown/frontmatter.ts
   - packages/confluence/src/page/{frontmatter,cache}.ts
-last_verified: 2026-09-29
 ---
 
 # Working File
@@ -50,14 +52,16 @@ A working file is an editable Markdown snapshot of one Jira issue or Confluence 
 | `SplitFrontmatter` | `editable` | Contains all top-level keys except the three reserved groups. |
 | `SplitFrontmatter` | `readonly`, `counts`, `lassi` | Separates server facts, related-item counts, and Lassi metadata. |
 | `IssueCache` | `editable`, `readonly`, `descriptionMarkdown` | Stores the Jira comparison baseline. |
-| `IssueCache` | `fieldSchema`, `aliases`, `descriptionWiki` | Retains field conversion metadata and original Jira source. |
-| `IssueFileState` | fetch snapshot, `updated`, `sections` | Keys one Jira baseline to one working-file path. |
+| `IssueCache` | `fieldSchema`, `aliases`, `descriptionWiki`, `formats` | Retains field conversion metadata, original Jira source, and wiki-rendered field IDs. |
+| `IssueFileState` | fetch snapshot, `updated`, `sections`, `formats` | Keys one Jira baseline and its rendering formats to one working-file path. |
 | `PageCache` | `version`, `storageSha256`, `files` | Identifies Confluence storage and per-file baselines. |
 | `PageFileState` | `parent`, `format`, `sections` | Retains page state and the generated tail for one file path. |
 
-Top-level product fields are the editable area. Jira exposes issue fields and configured custom-field aliases; Confluence exposes identity, title, space, and parent, but only title and parent may change. Field meanings are described in [Jira Domain](./jira-domain.md) and [Confluence Domain](./confluence-domain.md).
+Top-level product fields form the editable area. Jira places writable configured aliases there; read-only aliases and nonempty unaliased custom fields go under `readonly`, while excluded configured aliases are omitted. The fixed built-in fields keep their own places. [Jira Domain](./jira-domain.md) owns these policy rules. Confluence exposes identity, title, space, and parent, but only title and parent may change; see [Confluence Domain](./confluence-domain.md).
 
-`readonly` contains server facts displayed for context, `counts` summarizes related content, and `lassi` describes the snapshot. `splitEditable()` never treats those groups as update fields. Jira warns and ignores edits under `readonly`; Confluence validates its immutable fields before writing.
+`readonly` contains server facts displayed for context, `counts` summarizes related content, and `lassi` describes the snapshot. `splitEditable()` never treats those groups as update fields. Jira warns and ignores changes made inside `readonly`, but a nonwritable field moved to or changed as an editable top-level key fails before a write. Confluence validates its immutable fields before writing. Display names for unaliased custom fields are YAML comments beside nested `readonly.customfield_N` keys.
+
+`IssueCache.formats` and each path's `IssueFileState.formats` record which field IDs were shown as Markdown from wiki source. Write-back uses the exact file path's snapshot, even when current config differs or another fetch replaced the entity-level cache. An older snapshot without `formats` behaves as raw; changing today's config alone does not reinterpret an existing file.
 
 Cache identity has two parts: the server entity and the displayed path from the workspace root. A single entity may have several files fetched with different expansion options or at different times. A fetch to a different path preserves the earlier path's baseline; a successful fetch to the same path replaces it. This is path bookkeeping, not a transaction between the Markdown and cache writes. Failure recovery is described in [Working File Lifecycle](../features/working-file-lifecycle.md).
 
@@ -83,10 +87,11 @@ Directory roles remain separate:
 | `.lassi/work` | Default workspace area for editable copies. |
 | `.lassi/cache/jira` | Jira JSON baselines keyed by validated issue key. |
 | `.lassi/cache/jira/editmeta` | Jira edit metadata in `<project>.<issue-type-id>.json` files; [Jira Domain](./jira-domain.md) owns reuse rules. |
+| `.lassi/cache/jira/createmeta/<project>.json` | Project create metadata, separate from issue baselines and edit metadata; [Jira Domain](./jira-domain.md) owns validity rules and [Jira Issue Workflows](../features/jira-issue-workflows.md) owns command use. |
 | `.lassi/cache/confluence` | Versioned storage XML and page JSON sidecars. |
 | configured export root | User-wide archive input to search, with manifest-based protection for local edits. |
 
-## Key services and functions
+## Key Services/Functions (PUBLIC/EXPORTED only)
 
 | Module | Function/Method | Purpose |
 |---------|--------|---------|
@@ -103,7 +108,7 @@ Directory roles remain separate:
 ## Reference Implementations
 
 - `packages/cli/src/workfile/schema.ts` - the shared editable/reserved split.
-- `packages/cli/src/workfile/cache.ts` - safe issue and edit-metadata cache paths, damaged-cache handling, and atomic JSON publication.
+- `packages/cli/src/workfile/cache.ts` - safe issue, edit-metadata, and create-metadata cache paths, damaged-cache handling, and atomic JSON publication.
 - `packages/jira/src/issue/cache.ts` - entity and per-file Jira baselines.
 - `packages/confluence/src/page/cache.ts` - Confluence storage identity and per-file state.
 - `readWorkingFile()` - reference for enforcing the working-file envelope.

@@ -89,6 +89,21 @@ async function store(
   }
 }
 
+/** A fresh cache entry for the probed issue's project and type, without asking Jira for anything. */
+export async function cachedEditmeta(
+  ctx: Context,
+  client: JiraClient,
+  probe: JiraIssue
+): Promise<LoadedEditmeta | undefined> {
+  const key = cacheKey(ctx, client, probe);
+  if (!key) return undefined;
+  const hit = usableEditmetaCache(await readCache(ctx, key.path), {
+    ...key,
+    now: ctx.deps.now(),
+  });
+  return hit ? { fields: hit.fields, fetchedAt: hit.fetchedAt, cached: true } : undefined;
+}
+
 /**
  * Edit metadata for `update`, from the cache when it is fresh for the issue's project and type.
  * `probe` is an issue already fetched with `EDITMETA_PROBE_FIELDS`; without one, a cheap fetch
@@ -102,14 +117,8 @@ export async function loadEditmeta(
 ): Promise<LoadedEditmeta> {
   const probe =
     opts.probe ?? (await client.getIssue(issueKey, { fields: EDITMETA_PROBE_FIELDS, expand: [] }));
-  const key = cacheKey(ctx, client, probe);
-  if (key) {
-    const hit = usableEditmetaCache(await readCache(ctx, key.path), {
-      ...key,
-      now: ctx.deps.now(),
-    });
-    if (hit) return { fields: hit.fields, fetchedAt: hit.fetchedAt, cached: true };
-  }
+  const hit = await cachedEditmeta(ctx, client, probe);
+  if (hit) return hit;
   ctx.logger.warn(
     `fetching edit metadata for ${issueKey} to check ${opts.fieldNames.join(', ')}; ${SLOW}`
   );

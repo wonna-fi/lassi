@@ -25,7 +25,7 @@ import {
   writeJsonCache,
   writeWorkingFile,
 } from '../../workfile/index.js';
-import { aliasesOf } from './shared.js';
+import { aliasesOf, fieldPolicyOf } from './shared.js';
 
 export interface Expansion {
   /** `undefined` = not shown; `'all'` or the newest N. */
@@ -36,9 +36,10 @@ export interface Expansion {
 
 export interface IssueDocument {
   frontmatter: IssueFrontmatter;
-  /** Raw custom field id → display name, rendered as YAML comments. */
+  /** `readonly.<raw custom field id>` → display name, rendered as YAML comments. */
   fieldNames: Record<string, string>;
   fieldSchema: FrontmatterResult['fieldSchema'];
+  formats: FrontmatterResult['formats'];
   description: string;
   sections: string[];
   body: string;
@@ -56,7 +57,8 @@ export function buildIssueDocument(
     frontmatter,
     comments: fieldNames,
     fieldSchema,
-  } = issueToFrontmatter(issue, aliasesOf(ctx), {
+    formats,
+  } = issueToFrontmatter(issue, fieldPolicyOf(ctx), {
     baseUrl: client.baseUrl,
     fetchedAt: ctx.deps.now().toISOString(),
   });
@@ -80,6 +82,7 @@ export function buildIssueDocument(
     frontmatter,
     fieldNames,
     fieldSchema,
+    formats,
     description,
     sections,
     body: composeBody(description, sections),
@@ -154,7 +157,8 @@ export async function saveIssueWorkingFile(
     doc.description,
     doc.fieldSchema,
     aliasesOf(ctx),
-    joinSections(doc.sections)
+    joinSections(doc.sections),
+    doc.formats
   );
   cache.files = { ...previous?.files, [displayPath(deps.cwd, outPath)]: issueFileState(cache) };
   await writeJsonCache(cachePath, cache, deps.fs);

@@ -1,12 +1,13 @@
 ---
 title: "Feature: Jira Issue Workflows"
 type: feature
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 sources:
   - packages/jira/package.json
   - packages/cli/src/commands/shared/{storage,export-manifest}.ts
   - packages/cli/src/cli.ts
   - packages/cli/src/commands/jira/*.ts
+  - packages/cli/src/commands/jira/createmeta.ts
   - packages/cli/src/guard-write.ts
   - packages/cli/src/run-command.ts
   - packages/cli/src/context.ts
@@ -14,6 +15,9 @@ sources:
   - packages/cli/src/workfile/*.ts
   - packages/jira/src/index.ts
   - packages/jira/src/{client,fields,issue,changelog,digest}/**/*.ts
+  - packages/jira/src/fields/createmeta-cache.ts
+  - packages/cli/src/commands/doctor/checks/field-aliases.ts
+  - packages/core/src/config/schema.ts
 ---
 
 # Feature: Jira Issue Workflows
@@ -36,7 +40,7 @@ Before working with this feature, understand these concepts:
 
 1. Configure Jira access, aliases, and any default project or templates through the [Runtime Context](../concepts/runtime-context.md).
 2. Identify an issue by key, or pass `.` to derive a key from the current branch.
-3. Inspect the issue, search with JQL, or query create/edit metadata before authoring fields.
+3. Inspect the issue, search with JQL, or query create/edit metadata before authoring fields. `jira issue createmeta PROJECT [--type T]` fetches live metadata and refreshes the create cache for one type or every type.
 4. For local editing, run `jira issue get KEY --out file.md`, edit writable frontmatter and Markdown, then run `jira issue update KEY --file file.md --if-unchanged`. The flag enables a server-drift check; omitting it skips that check. See [Working File Lifecycle](./working-file-lifecycle.md) for caching and refresh behavior.
 5. Use `jira issue comment`, `jira issue attach`, and `jira issue transition` for comments, attachments, and transitions; use `jira issue export` for bulk export or `jira digest` for a personal activity digest. To remove a link, inspect `jira issue link list KEY1`, then run `jira issue link delete KEY1 KEY2 --type PHRASE` with the relationship as displayed from KEY1. `jira issue link create KEY1 KEY2 --type PHRASE` adds one; `jira link types` lists the instance's direction phrases.
 6. To assign project components, inspect `jira project component list PROJECT`, then run `jira issue component add KEY NAME...` or `jira issue component remove KEY NAME...`. Add `--create` to make missing project components before assigning them; `jira project component create PROJECT NAME --description TEXT` creates one independently.
@@ -47,11 +51,12 @@ Before working with this feature, understand these concepts:
 - Direct issue keys must match the Jira key shape. Branch lookup selects the first capture from a configured pattern; without one, it selects the first default-project match, then the first issue-shaped match anywhere. It accepts a selected key only if its shape is valid and does not reject branches with multiple keys.
 - `jira project component list/create` and `jira project version list` trim, uppercase, and validate their project argument as a project key, and reject `.`, which stands only for an issue key. `jira issue create --project` and `jira issue createmeta PROJECT` pass the project through unchanged.
 - `jira issue get KEY --comments` and `--comments all` include all comments. A numeric value must be a positive whole number and selects the newest N; invalid values fail even alongside `--all`.
-- `--field` uses `alias=value`; configured aliases, standard fields, and raw custom-field IDs are accepted.
-- Create requires project, issue type, and summary after template and flag merging. The live create-metadata check rejects other required fields only when unset and without a server default; it exempts auto-filled `project`, `issuetype`, and `reporter`.
+- `--field` uses `alias=value`; configured aliases, standard fields, and raw custom-field IDs are accepted. Update rejects changed fields that [Jira Domain](../concepts/jira-domain.md) marks read-only before any write. Create and transition use their own screen metadata rather than the update edit screen.
+- Create requires project, issue type, and summary after template and flag merging. The create-metadata check, using a fresh cached type or a live answer, rejects other required fields only when unset and without a server default; it exempts auto-filled `project`, `issuetype`, and `reporter`.
 - Body sources are mutually exclusive where commands accept both inline Markdown and a file or stdin.
-- If a working file contains a top-level `key`, it must match the command key. The reserved `readonly` mapping is informational and is excluded from update fields.
+- If a working file contains a top-level `key`, it must match the command key. Edits inside `readonly` warn and are ignored; moving or changing a nonwritable field as a top-level key fails. The file's saved wiki format determines conversion even after config changes; see [Working File](../concepts/working-file.md).
 - Update checks a changed value against allowed values only for the field types listed in [Jira Domain](../concepts/jira-domain.md). Clears and JSON values are never checked.
+- `format: wiki` fields take Markdown on create, update, and transition; `-` or empty `--field` values remain clears. Conversion checks pasted dialect syntax and mentions and prefixes lossy-conversion warnings with the field name; see [Jira Wiki Conversion](./jira-wiki-conversion.md).
 - File-based updates require a cached entry for that exact path and an unchanged generated tail. The cache does not authenticate the current file with a hash. `--if-unchanged` additionally compares the live server marker with the cached marker.
 - Transition names or IDs must select exactly one available transition; transition screen fields use that transition's metadata.
 - Comment deletion is limited to the current user's comments unless `--any` is supplied.
@@ -72,7 +77,14 @@ Before working with this feature, understand these concepts:
 | Two fields have the same display name | When field names are needed, the command warns that ID-less changes with that name can match more than one field. It still returns normal output. |
 | Search has more results than requested | The command reports shown versus total; `--all` paginates to the cap. |
 | Working-file update changes no writable data | After any requested drift check, return `no changes` without fetching edit metadata, sending an update, or rewriting the file. |
+| A changed field is absent from loaded edit metadata or lacks `set` | Fail validation before writing, including for description. A fresh cached answer may veto without another fetch and gives an `issue editmeta KEY` refresh hint. |
+| A custom field uses string shorthand in `jira.fields` | Doctor warns that it remains read-only by default until an object entry makes it editable. |
+| A configured field is excluded | Rendered frontmatter, Markdown and AXI issue output, working files, and exports omit it; `jira issue get --json` still includes it in the raw `issue` object, and the Jira field remains on the server. |
+| An unaliased custom field appears in AXI issue output | The compact summary omits its raw ID; the working file can still show a nonempty value under `readonly`. |
 | A changed value is outside the cached allowed values | Fail with a validation error before fetching edit metadata or sending the update; the hint names when the values were cached and `jira issue editmeta KEY` to refresh them. |
+| Cached create metadata rejects a required field or allowed value | Fail before POST and suggest `jira issue createmeta PROJECT --type TYPE` to refresh; hint selection belongs to [Error Contract](../concepts/error-contract.md). |
+| Create metadata cache cannot be read or saved | Warn on stderr and continue with a live answer or completed command. A malformed or stale entry is a cache miss. |
+| Live create metadata must be fetched | Warn that Jira may take minutes; a failed explicit refresh leaves the previous cache intact. |
 | Edit metadata must be fetched from Jira | A `warn:` line on stderr, hidden by `--quiet`, names the fields that need it, because Jira can take minutes to answer on large projects. |
 | A link type phrase names no type or several types | The command rejects it and points to `jira link types` or the exact direction phrase. |
 | Link deletion finds no matching relationship | It reports `not_found`; if the issues have another relationship, the hint prints its wording for `--type`. |
@@ -107,18 +119,22 @@ The public Jira client and field conversion services used by these commands are 
 | `jira issue component add KEY NAME... [--create]` / `jira issue component remove KEY NAME...` | Assign existing or newly created components, or remove assignments while leaving project components intact. |
 | `jira issue fix-version set KEY VERSION... [--add]` | Replace fix versions, or add to the issue's current set. |
 | `jira issue create/update` | Create from flags/templates or update fields, body, or a working file. |
-| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; `editmeta` also refreshes the cache that update reads. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID, including ID-less custom-field changes through aliases and IDs when Jira supplies their names. See [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
+| `jira issue createmeta/editmeta/changelog` | Inspect valid fields and ordered field history; both metadata commands fetch live and refresh their separate caches. `jira issue changelog KEY --fields` filters returned history by alias, name, or ID, including ID-less custom-field changes through aliases and IDs when Jira supplies their names. See [Jira Domain](../concepts/jira-domain.md) for field identity rules. |
 | `jira issue comment list/add/edit/delete` | Read and mutate issue comments. |
 | `jira issue attach get/upload` | Download bounded attachments or upload local files. |
 | `jira issue transition list/do` | Inspect and execute available transitions with screen fields. |
 | `jira issue link list/create/delete` | Inspect issue links, create a directed link, or remove one displayed relationship. |
 | `jira link types` | Inspect instance-level link types and their directional phrases. |
-| `jira fields` and `jira templates` | Inspect configured aliases and reusable creation templates. |
+| `jira fields` and `jira templates` | Inspect configured aliases with access, wiki format, and exclusion notes, or reusable creation templates. |
 | `jira digest` | Summarize assigned, mentioned, and recently changed work. |
 
 Command registration starts at `registerJira()`, which attaches every group to the `jira` command invoked by `createProgram()`. Reads and writes use the same context, output formats, structured errors, and injected services.
 
-Create merges template defaults before explicit flags, resolves live metadata, maps aliases, validates required fields, converts the Markdown description to Jira wiki markup, then calls the client. Update follows the same coercion rules, but loads edit metadata only when a changed field needs it; a transition uses its screen's metadata instead.
+Create merges template defaults with explicit flags, reads the body source, and resolves field aliases before loading one usable create-metadata type or fetching it live on a miss. It coerces field values, converts Markdown to Jira wiki markup, validates required fields, and reaches the write guard. This preparation also runs for `--dry-run`: it may warm the cache, but sends no issue POST.
+
+Explicit `jira issue createmeta PROJECT [--type T]` always fetches live. Type-scoped refreshes merge into the existing cache; a full refresh replaces the project's type set. Both writes hold the shared storage lock. Cache identity and freshness rules belong to [Jira Domain](../concepts/jira-domain.md); its directory is in [Working File](../concepts/working-file.md).
+
+Update follows the same coercion rules, but loads edit metadata only when a changed field needs it; a transition uses its screen's metadata instead.
 
 Issue retrieval requests expansion fields only when needed. A bare `--comments` or `--comments all` includes all comments; a positive integer selects the newest count. Attachments and links become generated read-only sections. `--out` writes the selected Markdown path and a per-path baseline under `.lassi/cache/jira/`, which later updates use to compute field and body changes.
 
@@ -128,7 +144,7 @@ The command families use these product-specific paths:
 
 | Operation | Read and preparation | Guarded effect |
 |-----------|----------------------|----------------|
-| Issue create | Merge template and flags; fetch create metadata; validate and coerce fields. | POST the issue fields and converted description. |
+| Issue create | Merge template and flags; load usable create metadata or fetch on a miss; validate and coerce fields. | POST the issue fields and converted description. |
 | Issue update | Collect file and flag changes; optionally compare the live marker; load edit metadata only when a final changed value needs it. | Convert the selected values, then guard and PUT only changed fields and description. |
 | Comment add/edit | Read Markdown from one selected source and convert it. | Create or replace the wiki body. |
 | Comment delete | Fetch current user and comment authorship unless `--any`. | Delete the selected comment. |
@@ -145,13 +161,13 @@ Each component create and the final issue update has its own `guardWrite()` call
 
 Project component listing includes archived entries and marks them in output. Version listing filters archived entries before rendering Markdown, JSON, or AXI. The project catalogs, types, and request semantics are defined in [Jira Domain](../concepts/jira-domain.md).
 
-Edit metadata is slow on large projects because Jira computes allowed values for every field on the edit screen. Update first collects changed file fields and `--field` values by resolved field ID, keeping the last value for each ID. It then decides which final values need metadata. Only when one does, it probes the issue for project and issue type, or reuses the issue fetched for `--if-unchanged`. It uses a fresh cache entry when available, otherwise fetches live metadata. Next it converts the selected values, reports cached allowed-value failures with a refresh hint, builds the payload, and passes it through the write guard before sending. `jira issue editmeta` always requests live metadata and stores a non-empty answer for later updates. Cache identity, validity, and the request deadline are in [Jira Domain](../concepts/jira-domain.md).
+Edit metadata is slow on large projects because Jira computes allowed values for every field on the edit screen. Update first collects changed file fields and `--field` values by resolved field ID, keeping the last value for each ID. It then decides which final values need metadata. Only when one does, it probes the issue for project and issue type, or reuses the issue fetched for `--if-unchanged`. It uses a fresh cache entry when available, otherwise fetches live metadata. A loaded answer checks every pending field and description for presence and the `set` operation. With `--if-unchanged`, a fresh cached answer can also veto without a metadata fetch; a no-op update fetches none. Next update converts the selected values, reports cached failures with a refresh hint, builds the payload, and passes it through the write guard. `jira issue editmeta` fetches live metadata and stores a nonempty answer. Cache validity belongs to [Jira Domain](../concepts/jira-domain.md).
 
 Issue export searches JQL page by page and writes one workfile/cache pair per issue under the archive lock. It includes attachment and link sections, with comments optional. The manifest records hashes, renderer settings, and query coverage. Failures remain attributable to individual keys; the lifecycle document describes conflict protection.
 
 Attachment download derives a stable local name from attachment ID and filename, filters by optional glob, enforces the effective byte limit, and writes into the selected directory. Existing names remain distinguishable because the server ID participates in the local filename.
 
-Reference commands deliberately expose Jira metadata rather than duplicating it in static help. `jira fields` relates configured aliases to server definitions, `jira link types` shows both directional labels, and create/edit metadata report required flags, schemas, and allowed values at the point of use.
+Reference commands expose Jira metadata at the point of use. `jira fields` shows resolved alias, ID, name, type, access, and wiki/excluded notes, with unresolved aliases separately; JSON and AXI include the policy booleans and format. `jira link types` shows directional labels, while create/edit metadata show required flags, schemas, and allowed values.
 
 Digest builds bounded queries for issues assigned to the current user, direct comment mentions, and recently updated work. It fetches issues and comments through the same Jira client and builds deterministic actions and snippets. An optional JQL clause narrows every section, while the per-section limit prevents one category from consuming the whole report. Comment snippets and changed values are bounded for readable output; JSON retains the structured records.
 
@@ -171,4 +187,4 @@ Follow [Tests and Fixtures](../conventions/tests-and-fixtures.md). Workflow test
 
 ## Extension Guide
 
-Add a remote operation to the public `JiraClient` and package barrel first, using the injected HTTP client. Register a CLI command beneath `registerJira()`, classify it as read or write, resolve keys and aliases through the shared helpers, and return all supported output forms. New writes must validate with Jira's field metadata where the value depends on it, call `guardWrite()` at the request boundary, and provide a dry-run preview. Slow metadata may come from a bounded local cache, as edit metadata does for update. Extend existing working-file sections only through the lifecycle's generated/read-only boundaries; do not create a second cache protocol.
+Add a remote operation to the public `JiraClient` and package barrel first, using the injected HTTP client. Register a CLI command beneath `registerJira()`, classify it as read or write, resolve keys and aliases through the shared helpers, and return all supported output forms. New writes must validate with Jira's field metadata where the value depends on it, call `guardWrite()` at the request boundary, and provide a dry-run preview. For issue creation, use the existing create-metadata loader so dry-run and actual writes share cache-aware validation; [Jira Domain](../concepts/jira-domain.md) defines the cache contract. Extend existing working-file sections only through the lifecycle's generated/read-only boundaries; do not create a second cache protocol.

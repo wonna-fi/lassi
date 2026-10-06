@@ -17,8 +17,9 @@ misconfigured.
    outside a ```` ```jira ```` fence; the CLI rejects it with exit 2.
 2. **Look before you write.** Before `issue create`, run `lassi jira templates` (use
    `--template <name>` when one fits), `lassi jira fields` and `lassi jira issue createmeta <PROJECT>
-   --type <TYPE>`. Before `issue update`, `lassi jira fields` is enough: update checks allowed values
-   itself. Run `lassi jira issue editmeta <KEY>` only to see them; Jira can take minutes to answer.
+   --type <TYPE>`. Before `issue update`, `lassi jira fields` is enough: it says which aliases are
+   editable, and update checks allowed values itself. Run `lassi jira issue editmeta <KEY>` only to
+   see them; Jira can take minutes to answer.
 3. **On a non-zero exit**, read the JSON on stderr, follow `hint`, retry **once**, then stop and ask
    the human. Never loop on the same error.
 4. **Attachments are files.** `lassi jira issue attach get <KEY>` downloads them to disk; read them with your
@@ -59,8 +60,13 @@ Every write accepts `--dry-run`. `LASSI_READ_ONLY=1` in the environment blocks a
 `issue get PROJ-123 --out work/PROJ-123.md` writes a markdown file with YAML frontmatter:
 
 - **Editable keys**: `summary`, `type`, `priority`, `assignee` (a *username*, never a display name),
-  `labels`, and every configured custom-field alias (discover aliases with `lassi jira fields`). Set a key to `null` to clear it.
+  `labels`, `components`, `fixVersions`, and the custom-field aliases `lassi jira fields` marks
+  `editable`. Set a key to `null` to clear it.
+- **Custom fields are read-only** unless `jira.fields` marks them editable. Read-only aliases and
+  unaliased custom fields (`customfield_10005: 3 # Story Points`) appear under `readonly`; adding one
+  as a top-level key is refused with exit 2. Excluded fields are left out of the file.
 - **`readonly`**, **`counts`** and **`lassi`** are informational; edits there are ignored with a warning.
+- A field marked `wiki` holds Markdown: edit it like the description, never with wiki markup.
 - **The body is the description.** Sections `## Comments`, `## Attachments`, `## Links` are generated
   and never sent; leave them untouched or delete them entirely.
 
@@ -73,10 +79,13 @@ original is cached under `.lassi/cache/jira/`; do not edit that directory.
 
 - `@username` in a body becomes a Jira mention; usernames are validated before anything is sent
   (unknown → exit 5). Use the `assignee`/`reporter` values you see in issue files, not names.
-- `--field alias=value`: aliases come from `references/fields.md`; raw ids (`customfield_10005`)
-  work too. `-` or an empty value clears a field; a value starting with `{` or `[` is sent as JSON
-  (escape hatch for cascading selects); select options are matched case-insensitively against the
-  allowed values and a mismatch lists them.
+- `--field alias=value`: editable aliases come from `references/fields.md`; the raw id of an
+  editable field (`customfield_10030`) works too. A read-only field is refused with exit 2 before
+  anything is sent. `-` or an empty value clears a field; a value starting with `{` or `[` is sent as
+  JSON (escape hatch for cascading selects), except for a `wiki` field, which takes Markdown; select
+  options are matched case-insensitively against the allowed values and a mismatch lists them.
+- When update has the edit metadata at hand, a field Jira does not offer for editing is refused with
+  exit 5 before anything is sent; the hint says how to refresh cached metadata.
 - Required fields missing on create fail *before* any request, naming the aliases and the
   `createmeta` command to run.
 
@@ -112,5 +121,5 @@ More in `references/errors.md`.
 - `references/workflows.md` — step-by-step sequences with `--dry-run` first
 - `references/formatting.md` — the markdown ↔ wiki dialect as implemented
 - `references/errors.md` — the error contract and what each hint means
-- `references/fields.md` — this instance's field aliases and allowed values (generated)
+- `references/fields.md` — this instance's field aliases, types and access (generated)
 - `references/link-types.md` — this instance's link types and directions (generated)

@@ -43,7 +43,8 @@ own comments (`--any` only when the human asked).
 
 ```sh
 lassi jira issue get . --out work/PROJ-123.md       # "." = the issue on the current branch
-# edit work/PROJ-123.md: frontmatter keys (summary, assignee, labels, aliases) and the description
+# edit work/PROJ-123.md: top-level frontmatter keys (summary, assignee, labels, editable aliases)
+# and the description; the keys under `readonly` are never sent
 lassi jira issue update . --file work/PROJ-123.md --if-unchanged --dry-run
 lassi jira issue update . --file work/PROJ-123.md --if-unchanged
 ```
@@ -53,6 +54,11 @@ lassi jira issue update . --file work/PROJ-123.md --if-unchanged
   the edit, send once more.
 - Exit 2 mentioning generated sections: you edited `## Comments`/`## Attachments`/`## Links`; they are
   never sent, so restore or delete them.
+- Exit 2 "read-only field": that custom field is not marked editable in `jira.fields`. Leave it
+  alone, or ask the human to mark it editable.
+- Exit 5 "Jira does not let … be updated through …": the issue's edit screen does not offer that
+  field. Drop the change; if the hint says the metadata was cached, run `issue editmeta <KEY>` once
+  and retry.
 - After success the file is rewritten from the server; re-read it before editing again.
 
 ## Create an issue with required fields

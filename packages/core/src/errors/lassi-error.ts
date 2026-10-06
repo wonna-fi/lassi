@@ -28,6 +28,10 @@ export interface HintContext {
   allowedValues?: Record<string, string[]>;
   /** When the allowed values a value was checked against came from a local cache, not the server. */
   allowedValuesCachedAt?: string;
+  /** When the edit metadata that refused a field came from a local cache, not the server. */
+  editmetaCachedAt?: string;
+  /** When create validation used metadata from a previous CLI invocation. */
+  createmetaCachedAt?: string;
   transition?: boolean;
   operation?: 'create' | 'update' | 'transition' | 'comment' | 'link' | 'search' | 'other';
 }

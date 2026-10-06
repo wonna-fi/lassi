@@ -1,5 +1,6 @@
 export {
   LassiConfigSchema,
+  type JiraFieldEntry,
   type LassiConfig,
   type IssueTemplate,
   type ProductConfig,

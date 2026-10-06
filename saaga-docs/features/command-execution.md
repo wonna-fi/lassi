@@ -1,7 +1,7 @@
 ---
 title: "Feature: Command Execution"
 type: feature
-last_verified: 2026-10-03
+last_verified: 2026-10-06
 sources:
   - packages/cli/src/cli.ts
   - packages/cli/src/commands/{jira,confluence}/*.ts
@@ -88,7 +88,7 @@ Before working with this feature, understand these concepts:
 | `GlobalFlags` | `json`, `axi`, `dryRun`, `config`, `quiet`, `verbose` | Controls context creation and global execution behavior. |
 | `DryRunPreview` | `method`, `path`, `payloadLabel`, `payload`, `note` | Describes the request a write would send without including credentials. |
 
-### Services and functions
+### Services/Functions
 
 | Module | Function/Method | Purpose |
 |---------|--------|---------|
@@ -107,7 +107,7 @@ Before working with this feature, understand these concepts:
 | Command surface | Purpose |
 |-----------|---------|
 | `lassi jira issue …` / `lassi jira project …` | Issue operations include comments, attachments, transitions, links, components, and fix versions; project operations manage component and version catalogs. Instance-level `lassi jira link types` remains outside those groups; see [Jira Issue Workflows](./jira-issue-workflows.md). |
-| `lassi jira fields`, `lassi jira templates`, `lassi jira digest` | Inspect configured field aliases and creation templates, or summarize personal activity. |
+| `lassi jira fields`, `lassi jira templates`, `lassi jira digest` | Inspect configured field access and format, inspect creation templates, or summarize personal activity; see [Jira Issue Workflows](./jira-issue-workflows.md). |
 | `lassi confluence page …` | Page operations include footer comments and attachments. `lassi confluence comment delete` remains outside the page group because it addresses a comment by ID; see [Confluence Page Workflows](./confluence-page-workflows.md). |
 | `lassi confluence search`, `lassi confluence tree`, `lassi confluence stats macros` | Search content, walk a page or space hierarchy, or report macro use and conversion statistics. |
 | `lassi search …` | Builds, inspects, and queries the local semantic index. |
@@ -125,7 +125,7 @@ Quiet and verbose affect diagnostics, not result shape. Quiet retains error-leve
 
 Dry-run behavior has two coordinated surfaces. The early read-only assertion allows a dry-run to reach its handler, so the handler can parse files, resolve identifiers, validate state, and construct the exact mutation. The late `guardWrite()` repeats the read-only assertion and decides between rendering that mutation and issuing it. JSON or AXI handlers return structured preview data; Markdown preview text is written by the guard itself.
 
-The command classification decides what read-only mode blocks. Remote product mutations, search indexing, and skill installation are classified as `write` and are blocked unless `--dry-run` is set. Export, attachment download, and `jira issue editmeta` are classified as `read`, so they may save local files. Read-only mode is not a filesystem sandbox.
+The command classification decides what read-only mode blocks. Remote product mutations, search indexing, and skill installation are classified as `write` and are blocked unless `--dry-run` is set. Export, attachment download, `jira issue createmeta`, and `jira issue editmeta` are classified as `read`, so their local file or cache writes remain permitted. Read-only mode is not a filesystem sandbox; [Jira Issue Workflows](./jira-issue-workflows.md) owns the metadata command flow and [Jira Domain](../concepts/jira-domain.md) owns cache validity.
 
 ## Integration Points
 

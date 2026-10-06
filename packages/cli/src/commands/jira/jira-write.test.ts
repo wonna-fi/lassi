@@ -107,6 +107,7 @@ const ROUTES: Route[] = [
     json: {
       fields: {
         summary: { name: 'Summary', required: true, schema: { type: 'string' } },
+        description: { name: 'Description', required: false, schema: { type: 'string' } },
         customfield_10001: {
           name: 'Team',
           required: false,
@@ -157,7 +158,10 @@ const ROUTES: Route[] = [
 
 const WORKSPACE = {
   '/home/u/proj/.lassi.json': JSON.stringify({
-    jira: { fields: { team: 'customfield_10001' }, defaultProject: 'PROJ' },
+    jira: {
+      fields: { team: { id: 'customfield_10001', editable: true } },
+      defaultProject: 'PROJ',
+    },
   }),
 };
 
@@ -413,7 +417,7 @@ describe('lassi jira issue create', () => {
         },
       ],
     });
-    expect(await t.run([...base, '--field', 'team=Web'])).toBe(5);
+    expect(await t.run([...base, '--field', 'team=Web', '--quiet'])).toBe(5);
     const lines = t.stderr().trim().split('\n');
     expect(lines[0]).toBe('error: Jira rejected the request (400): Team is required.');
     expect(JSON.parse(lines[1] as string)).toEqual({
@@ -884,11 +888,20 @@ describe('lassi jira issue update: edit metadata only when a change needs it', (
     expect(editmetaCalls(t)).toHaveLength(1);
   });
 
-  it('does not cache an empty answer, which a non-editable status gives', async () => {
+  it('refuses, and does not cache, an empty answer, which a non-editable status gives', async () => {
     const t = program({
       routes: [{ path: '/rest/api/2/issue/PROJ-123/editmeta', json: { fields: {} } }],
     });
-    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
+    expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(5);
+    expect(writes(t)).toHaveLength(0);
+    const err = lastJsonLine(t.stderr());
+    expect(err).toMatchObject({
+      code: 'validation',
+      message:
+        'Jira lists no editable fields for PROJ-123; its status or your permissions forbid editing',
+      errors: { customfield_10001: 'not on the edit screen' },
+      hint: 'check the status with `lassi jira issue get PROJ-123` and that you may edit it in Jira',
+    });
     expect(await t.fs.exists(EDITMETA_CACHE)).toBe(false);
   });
 
@@ -929,6 +942,359 @@ describe('lassi jira issue update: edit metadata only when a change needs it', (
     expect(await t.fs.exists(EDITMETA_CACHE)).toBe(true);
     expect(await t.run(['jira', 'issue', 'update', 'PROJ-123', '--field', 'team=web'])).toBe(0);
     expect(editmetaCalls(t)).toHaveLength(1);
+  });
+});
+
+const POLICY_ISSUE = {
+  ...ISSUE,
+  fields: {
+    ...ISSUE.fields,
+    customfield_10005: 3,
+    customfield_10020: 'h1. Title\n*bold* text',
+    customfield_10077: 'unaliased',
+  },
+  names: { customfield_10077: 'Some Field' },
+  schema: {
+    ...ISSUE.schema,
+    customfield_10005: { type: 'number' },
+    customfield_10020: { type: 'string' },
+    customfield_10077: { type: 'string' },
+  },
+};
+
+const POLICY_FIELDS = {
+  team: { id: 'customfield_10001', editable: true },
+  points: 'customfield_10005',
+  notes: { id: 'customfield_10020', format: 'wiki', editable: true },
+};
+
+function policyProgram(
+  opts: { routes?: Route[]; env?: Record<string, string>; fields?: Record<string, unknown> } = {}
+) {
+  return program({
+    ...(opts.env ? { env: opts.env } : {}),
+    routes: [
+      ...(opts.routes ?? []),
+      { method: 'GET', path: '/rest/api/2/issue/PROJ-123', json: POLICY_ISSUE },
+    ],
+    files: {
+      '/home/u/proj/.lassi.json': JSON.stringify({
+        jira: { fields: opts.fields ?? POLICY_FIELDS, defaultProject: 'PROJ' },
+      }),
+    },
+  });
+}
+
+const WORK = '/home/u/proj/work/PROJ-123.md';
+const update = (...args: string[]) => ['jira', 'issue', 'update', 'PROJ-123', ...args];
+
+describe('lassi jira issue update: field policy', () => {
+  it('refuses --field on a read-only alias or an unaliased custom field before any request', async () => {
+    const t = policyProgram();
+    expect(await t.run(update('--field', 'points=5', '--field', 'customfield_10077=x'))).toBe(2);
+    expect(t.fetch.calls).toHaveLength(0);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'usage',
+      message: 'read-only fields: points (customfield_10005), customfield_10077',
+      hint: 'set "editable": true on jira.fields.points; add { "id": "customfield_10077", "editable": true } under jira.fields to let Lassi write them, if Jira allows it (`lassi jira fields` lists the policy)',
+    });
+  });
+
+  it('accepts the raw id of a field an entry makes editable', async () => {
+    const t = policyProgram();
+    expect(await t.run(update('--field', 'customfield_10001=web'))).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10001: { value: 'Web' } },
+    });
+  });
+
+  it('refuses a read-only field moved to the top level, and ignores an edit under readonly', async () => {
+    const t = policyProgram();
+    expect(await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md'])).toBe(0);
+    const original = await t.fs.readFile(WORK);
+    expect(original).toContain('\n  points: 3\n');
+    expect(original).toContain('\n  customfield_10077: unaliased # Some Field\n');
+
+    await t.fs.writeFile(WORK, original.replace('\n  points: 3\n', '\n  points: 5\n'));
+    expect(await t.run(update('--file', 'work/PROJ-123.md'))).toBe(0);
+    expect(t.stdout()).toContain('no changes for PROJ-123\n');
+    expect(t.stderr()).toContain('warn: readonly.points was edited; ignored\n');
+
+    await t.fs.writeFile(
+      WORK,
+      original.replace('\nteam: Platform\n', '\nteam: Platform\npoints: 5\n')
+    );
+    expect(await t.run(update('--file', 'work/PROJ-123.md'))).toBe(2);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'usage',
+      message: 'read-only field: points (customfield_10005)',
+    });
+    expect(writes(t)).toHaveLength(0);
+  });
+
+  it('refuses an edited top-level custom field from a file fetched before custom fields were read-only', async () => {
+    const t = policyProgram();
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    // The earlier layout: custom fields at the top level, and in the cached editable keys.
+    const cachePath = '/home/u/proj/.lassi/cache/jira/PROJ-123.json';
+    const cache = JSON.parse(await t.fs.readFile(cachePath));
+    cache.files['work/PROJ-123.md'].editable.customfield_10077 = 'unaliased';
+    await t.fs.writeFile(cachePath, JSON.stringify(cache));
+    const file = await t.fs.readFile(WORK);
+    const top = file.replace(
+      '\nteam: Platform\n',
+      '\nteam: Platform\ncustomfield_10077: unaliased\n'
+    );
+    await t.fs.writeFile(WORK, top);
+    expect(await t.run(update('--file', 'work/PROJ-123.md'))).toBe(0);
+    expect(t.stdout()).toContain('no changes for PROJ-123\n');
+    await t.fs.writeFile(
+      WORK,
+      top.replace('customfield_10077: unaliased', 'customfield_10077: edited')
+    );
+    expect(await t.run(update('--file', 'work/PROJ-123.md'))).toBe(2);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      message: 'read-only field: customfield_10077',
+    });
+    expect(writes(t)).toHaveLength(0);
+  });
+
+  it('shows a wiki field as Markdown and sends an edit back as wiki markup', async () => {
+    const t = policyProgram();
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    const original = await t.fs.readFile(WORK);
+    expect(original).toContain('\nnotes: |-\n  # Title\n\n  **bold** text\n');
+    await t.fs.writeFile(WORK, original.replace('**bold** text', '**bold** text, `code`'));
+    expect(await t.run(['--dry-run', ...update('--file', 'work/PROJ-123.md')])).toBe(0);
+    expect(t.stdout()).toContain('"customfield_10020": "h1. Title\\n\\n*bold* text, {{code}}\\n"');
+    expect(await t.run(update('--file', 'work/PROJ-123.md', '--keep'))).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10020: 'h1. Title\n\n*bold* text, {{code}}\n' },
+    });
+  });
+
+  it('takes Markdown, not JSON, from --field for a wiki field, and names it when that fails', async () => {
+    const t = policyProgram();
+    expect(await t.run(update('--field', 'notes=[x](https://example.test)'))).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10020: '[x|https://example.test]\n' },
+    });
+    expect(await t.run(update('--field', 'notes=-'))).toBe(0);
+    // The same clears as every other field: surrounding whitespace does not make them Markdown.
+    expect(await t.run(update('--field', 'notes= - '))).toBe(0);
+    expect(await t.run(update('--field', 'notes=   '))).toBe(0);
+    expect(
+      writes(t)
+        .slice(1)
+        .map((w) => JSON.parse(w.bodyText ?? ''))
+    ).toEqual([
+      { fields: { customfield_10020: null } },
+      { fields: { customfield_10020: null } },
+      { fields: { customfield_10020: null } },
+    ]);
+    expect(await t.run(update('--field', 'notes=h2. Pasted wiki'))).toBe(2);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'usage',
+      message: expect.stringMatching(/^notes: /),
+    });
+    expect(writes(t)).toHaveLength(4);
+  });
+
+  it('converts only the value that is sent when --field replaces a file edit', async () => {
+    const t = policyProgram();
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    // Converting the file's value would look the mention up and fail on an unknown user.
+    await t.fs.writeFile(
+      WORK,
+      (await t.fs.readFile(WORK)).replace('**bold** text', '**bold** text for @ghost')
+    );
+    expect(
+      await t.run(update('--file', 'work/PROJ-123.md', '--keep', '--field', 'notes=plain'))
+    ).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10020: 'plain\n' },
+    });
+  });
+
+  it('sends Markdown typed into a wiki field that was empty when fetched as wiki markup', async () => {
+    const t = policyProgram({
+      routes: [
+        {
+          method: 'GET',
+          path: '/rest/api/2/issue/PROJ-123',
+          json: { ...POLICY_ISSUE, fields: { ...POLICY_ISSUE.fields, customfield_10020: null } },
+        },
+      ],
+    });
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    const original = await t.fs.readFile(WORK);
+    expect(original).toContain('\nnotes: null\n');
+    await t.fs.writeFile(WORK, original.replace('\nnotes: null\n', '\nnotes: "**now** set"\n'));
+    expect(await t.run(update('--file', 'work/PROJ-123.md', '--keep'))).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10020: '*now* set\n' },
+    });
+  });
+
+  it("converts by the format this file was fetched with, not another file's", async () => {
+    const t = policyProgram({
+      fields: { ...POLICY_FIELDS, notes: { id: 'customfield_10020', editable: true } },
+    });
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    expect(await t.fs.readFile(WORK)).toContain('\nnotes: |-\n  h1. Title\n  *bold* text\n');
+    await t.fs.writeFile(
+      '/home/u/proj/.lassi.json',
+      JSON.stringify({ jira: { fields: POLICY_FIELDS, defaultProject: 'PROJ' } })
+    );
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/other.md']);
+    // As a cache written before formats existed: only the later fetch, of other.md, records any.
+    const cachePath = '/home/u/proj/.lassi/cache/jira/PROJ-123.json';
+    const cache = JSON.parse(await t.fs.readFile(cachePath));
+    expect(cache.formats).toEqual({ customfield_10020: 'wiki' });
+    delete cache.files['work/PROJ-123.md'].formats;
+    await t.fs.writeFile(cachePath, JSON.stringify(cache));
+    await t.fs.writeFile(WORK, (await t.fs.readFile(WORK)).replace('*bold* text', '*bold* edit'));
+    expect(await t.run(update('--file', 'work/PROJ-123.md', '--keep'))).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toEqual({
+      fields: { customfield_10020: 'h1. Title\n*bold* edit' },
+    });
+  });
+
+  it('takes Markdown for a wiki field on create, from --field and from a template', async () => {
+    const t = program({
+      files: {
+        '/home/u/proj/.lassi.json': JSON.stringify({
+          jira: {
+            fields: POLICY_FIELDS,
+            defaultProject: 'PROJ',
+            templates: {
+              noted: { type: 'Bug', fields: { team: 'Web', notes: '**from** template' } },
+            },
+          },
+        }),
+      },
+    });
+    const create = ['jira', 'issue', 'create', '--type', 'Bug', '--summary', 'Broken login'];
+    expect(
+      await t.run([...create, '--field', 'team=web', '--field', 'notes=[x](https://example.test)'])
+    ).toBe(0);
+    expect(await t.run([...create, '--template', 'noted'])).toBe(0);
+    expect(writes(t).map((w) => JSON.parse(w.bodyText ?? '').fields.customfield_10020)).toEqual([
+      '[x|https://example.test]\n',
+      '*from* template\n',
+    ]);
+  });
+
+  it('takes Markdown for a wiki field on a transition', async () => {
+    const t = policyProgram();
+    expect(
+      await t.run([
+        'jira',
+        'issue',
+        'transition',
+        'do',
+        'PROJ-123',
+        'start',
+        '--field',
+        'notes=**started**',
+      ])
+    ).toBe(0);
+    expect(JSON.parse(writes(t)[0]?.bodyText ?? '')).toMatchObject({
+      transition: { id: '11' },
+      fields: { customfield_10020: '*started*\n' },
+    });
+  });
+
+  it('refuses under read-only mode before anything else', async () => {
+    const t = policyProgram({ env: { LASSI_READ_ONLY: '1' } });
+    expect(await t.run(update('--field', 'team=web'))).toBe(7);
+    expect(t.fetch.calls).toHaveLength(0);
+  });
+});
+
+describe('lassi jira issue update: edit metadata vetoes what Jira would refuse', () => {
+  const editmetaWith = (fields: Record<string, unknown>): Route => ({
+    path: '/rest/api/2/issue/PROJ-123/editmeta',
+    json: { fields },
+  });
+  const TEAM = {
+    name: 'Team',
+    required: false,
+    schema: { type: 'option' },
+    allowedValues: [{ value: 'Platform' }, { value: 'Web' }],
+  };
+
+  it('refuses a field missing from the loaded edit metadata, with no PUT', async () => {
+    const t = program();
+    expect(await t.run(update('--field', 'team=web', '--field', 'priority=High'))).toBe(5);
+    expect(writes(t)).toHaveLength(0);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'validation',
+      message: 'Jira does not let PROJ-123 be updated through priority: not on the edit screen',
+      errors: { priority: 'not on the edit screen' },
+      hint: 'Run `lassi jira issue editmeta PROJ-123` to see editable fields and allowed values.',
+    });
+  });
+
+  it('refuses a field offered without the set operation, and a description missing from it', async () => {
+    const t = program({
+      routes: [editmetaWith({ customfield_10001: { ...TEAM, operations: ['add'] } })],
+    });
+    expect(await t.run(update('--field', 'team=web', '--body', 'New text'))).toBe(5);
+    expect(writes(t)).toHaveLength(0);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      message:
+        'Jira does not let PROJ-123 be updated through team (customfield_10001), description: cannot be set (operations: add); not on the edit screen',
+      errors: {
+        customfield_10001: 'cannot be set (operations: add)',
+        description: 'not on the edit screen',
+      },
+    });
+  });
+
+  it('says when the refusing metadata came from the cache', async () => {
+    const t = program({ files: { [EDITMETA_CACHE]: cachedEditmeta('2026-09-04T09:00:00.000Z') } });
+    expect(await t.run(update('--field', 'team=web', '--field', 'priority=High'))).toBe(5);
+    expect(editmetaCalls(t)).toHaveLength(0);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      code: 'validation',
+      hint: 'The edit metadata was cached at 2026-09-04T09:00:00.000Z, possibly from another issue of the same project and type; run `lassi jira issue editmeta PROJ-123` to refresh it.',
+    });
+  });
+
+  it('checks a fresh cache entry the --if-unchanged probe finds, without another request', async () => {
+    const t = program({ files: { [EDITMETA_CACHE]: cachedEditmeta('2026-09-04T09:00:00.000Z') } });
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    await t.fs.writeFile(
+      WORK,
+      (await t.fs.readFile(WORK)).replace(
+        'summary: Login page throws 500 on empty password',
+        'summary: Edited'
+      )
+    );
+    const before = t.fetch.calls.length;
+    expect(await t.run(update('--file', 'work/PROJ-123.md', '--if-unchanged'))).toBe(5);
+    expect(t.fetch.calls.slice(before).map((c) => `${c.method} ${c.url.pathname}`)).toEqual([
+      'GET /rest/api/2/issue/PROJ-123',
+    ]);
+    expect(lastJsonLine(t.stderr())).toMatchObject({
+      errors: { summary: 'not on the edit screen' },
+    });
+  });
+
+  it('still answers "no changes" without metadata when nothing changed', async () => {
+    const t = program({ routes: [editmetaWith({})] });
+    await t.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md']);
+    expect(await t.run(update('--file', 'work/PROJ-123.md', '--if-unchanged'))).toBe(0);
+    expect(t.stdout()).toContain('no changes for PROJ-123\n');
+    expect(editmetaCalls(t)).toHaveLength(0);
+  });
+
+  it('previews nothing under --dry-run when the veto applies', async () => {
+    const t = program();
+    expect(await t.run(['--dry-run', ...update('--field', 'priority=High')])).toBe(5);
+    expect(writes(t)).toHaveLength(0);
+    expect(t.stdout()).toBe('');
   });
 });
 

@@ -10,10 +10,10 @@ Every failure prints one human line and one JSON line on stderr; stdout stays em
 |---|---|---|---|
 | 0 | | success (also `--dry-run`, "no changes") | continue |
 | 1 | `network`, `tls`, `timeout`, `http`, `internal` | instance unreachable, certificate not trusted, 5xx after retries | run `lassi doctor`; TLS → the human must set `NODE_EXTRA_CA_CERTS`; do not retry more than once |
-| 2 | `usage` | bad flag, unknown field alias, unparsable input, pasted wiki markup, missing cache for `--file` | fix the command; hints name `lassi jira fields`, `lassi jira issue editmeta <KEY>`, or `issue get --out` |
+| 2 | `usage` | bad flag, unknown field alias, read-only custom field, invalid `jira.fields`, unparsable input, pasted wiki markup, missing cache for `--file` | fix the command; hints name `lassi jira fields`, `lassi jira issue editmeta <KEY>`, or `issue get --out` |
 | 3 | `auth` | 401/403, empty or expired token | stop; tell the human which token file is in `tokenFile` and to run `lassi doctor` |
 | 4 | `not_found` | unknown key, project, user or comment id | check the key; `lassi jira issue search` to look it up |
-| 5 | `validation` | Jira's field errors (`errors` verbatim, `errorsByAlias` by alias), missing required fields, unknown `@mention`, unrepresentable markdown, comment not yours | fix the fields or the markdown; hints name `createmeta`/`editmeta`/`transition list`; `--any` only if the human asked |
+| 5 | `validation` | Jira's field errors (`errors` verbatim, `errorsByAlias` by alias), missing required fields, a field not on the edit screen, unknown `@mention`, unrepresentable markdown, comment not yours | fix the fields or the markdown; hints name `createmeta`/`editmeta`/`transition list`; `--any` only if the human asked |
 | 6 | `conflict` | `--if-unchanged` drift, 409 | `lassi jira issue get <KEY> --out <same file>`, re-apply the edit, retry once |
 | 7 | `read_only` | `LASSI_READ_ONLY` is set | stop; writes are disabled on purpose |
 
@@ -23,6 +23,9 @@ Every failure prints one human line and one JSON line on stderr; stdout stays em
 |---|---|
 | Missing required field on create | `lassi jira issue createmeta <P> --type <T>` and the aliases of the missing ids |
 | Unknown field on update | `lassi jira issue editmeta <KEY>` |
+| Read-only custom field on update | the `jira.fields` entry to mark `"editable": true`; leave the field alone unless the human wants that |
+| Field not on the edit screen | `lassi jira issue editmeta <KEY>`; with cached metadata, when it was cached and that it may come from another issue |
+| Issue in a status that forbids editing | check the status with `lassi jira issue get <KEY>` |
 | Invalid option value | the allowed values from metadata |
 | Transition failed on screen fields | `lassi jira issue transition list <KEY>` |
 | 401 | the token file path and `lassi doctor` |

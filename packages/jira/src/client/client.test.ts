@@ -304,6 +304,33 @@ describe('createJiraClient', () => {
     expect(await c.fields()).toEqual([{ id: 'summary', name: 'Summary', custom: false }]);
   });
 
+  it.each(['paginated', 'legacy'])(
+    'waits longer for %s create fields without retrying a timeout',
+    async (mode) => {
+      let calls = 0;
+      const c = createJiraClient({
+        baseUrl: BASE,
+        token: 'pat-token-1234',
+        timeoutMs: 5,
+        fetch: async () => {
+          calls += 1;
+          if (calls === 1)
+            return mode === 'paginated'
+              ? Response.json(PAGINATED_TYPES.json)
+              : Response.json({}, { status: 404 });
+          throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+        },
+        random: () => 0,
+        sleep: async () => {},
+      });
+      await expect(c.createmeta('PROJ', 'Bug')).rejects.toMatchObject({
+        code: 'timeout',
+        message: 'request timed out after 180000 ms',
+      });
+      expect(calls).toBe(2);
+    }
+  );
+
   it('waits longer for editmeta and does not repeat it after a timeout', async () => {
     let calls = 0;
     const c = createJiraClient({

@@ -7,6 +7,13 @@ export {
 } from './aliases.js';
 export { coerceFieldValue, isLiteralFieldValue, parseFieldArg, splitList } from './coerce.js';
 export {
+  CREATEMETA_CACHE_TTL_MS,
+  readCreatemetaCache,
+  usableCreateType,
+  type CachedCreateType,
+  type CreatemetaCache,
+} from './createmeta-cache.js';
+export {
   EDITMETA_CACHE_TTL_MS,
   usableEditmetaCache,
   type EditmetaCache,
@@ -26,3 +33,15 @@ export {
   scalarToApiValue,
   standardSchema,
 } from './normalize.js';
+export {
+  assertWritable,
+  fieldAliases,
+  fieldPolicy,
+  formatOf,
+  isExcluded,
+  isWritable,
+  type FieldConfigEntry,
+  type FieldFormat,
+  type FieldPolicy,
+  type FieldSettings,
+} from './policy.js';
