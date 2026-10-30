@@ -28,6 +28,7 @@ export {
   type ComponentRef,
 } from './client/components.js';
 export { findByName } from './client/named.js';
+export { labelUpdate, planLabelChange, type LabelChangePlan } from './client/labels.js';
 export { allowedVersions, fixVersionsUpdate, resolveVersions } from './client/versions.js';
 export {
   createJiraClient,

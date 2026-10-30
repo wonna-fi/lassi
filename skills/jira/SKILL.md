@@ -49,6 +49,7 @@ Use a known key directly, JQL for field constraints, semantic search for meaning
 | Transition | `lassi jira issue transition list PROJ-123`, then `lassi jira issue transition do PROJ-123 "In Review" --field resolution=Fixed` |
 | Attachments | `lassi jira issue attach get PROJ-123 --only "*.png"`; `lassi jira issue attach upload PROJ-123 ./log.txt` |
 | Links | `lassi jira link types`; `lassi jira issue link list PROJ-123`; `lassi jira issue link create PROJ-1 PROJ-2 --type "blocks"`; `lassi jira issue link delete PROJ-1 PROJ-2 --type "blocks"` |
+| Labels | `lassi jira issue label add PROJ-123 backend needs-review`; `lassi jira issue label remove PROJ-123 needs-review` (keep unrelated labels; `issue update --field 'labels=["backend"]'` replaces the list) |
 | Components | `lassi jira project component list PROJ`; `lassi jira issue component add PROJ-123 Backend` (`--create` makes a missing one); `lassi jira issue component remove PROJ-123 Backend` |
 | Fix versions | `lassi jira project version list PROJ`, then `lassi jira issue fix-version set PROJ-123 2.1` (replaces; `--add` keeps the others) |
 | Field metadata | `lassi jira fields`; `lassi jira issue createmeta PROJ --type Bug`; `lassi jira issue editmeta PROJ-123` |

@@ -97,6 +97,8 @@ for (const command of [
   'jira issue attach get',
   'jira issue transition do',
   'jira issue link create',
+  'jira issue label add',
+  'jira issue label remove',
   'jira project component create',
   'jira project version list',
   'jira link types',

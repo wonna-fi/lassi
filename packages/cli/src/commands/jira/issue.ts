@@ -26,6 +26,7 @@ import { fetchEditmeta } from './editmeta.js';
 import { registerIssueExport } from './export.js';
 import { resolveIssueKey } from './issue-key.js';
 import { registerIssueWrites } from './issue-write.js';
+import { registerIssueLabel } from './label.js';
 import { registerIssueFixVersion } from './version.js';
 import {
   buildIssueDocument,
@@ -401,6 +402,7 @@ export function registerIssue(issue: Command, deps: CliDeps, session: Session): 
 
   registerIssueWrites(issue, deps, session);
   registerIssueComponent(issue, deps, session);
+  registerIssueLabel(issue, deps, session);
   registerIssueFixVersion(issue, deps, session);
   registerIssueExport(issue, deps, session);
 }

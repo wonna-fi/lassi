@@ -116,6 +116,22 @@ Either the outward or the inward phrase is accepted; the CLI flips the direction
 sentence it will create. `link delete` takes the sentence as `link list` prints it; when it names
 no link, the error lists the links that do exist between the two issues.
 
+## Labels
+
+```sh
+lassi jira issue label add PROJ-123 backend needs-review --dry-run
+lassi jira issue label add PROJ-123 backend needs-review
+lassi jira issue label remove PROJ-123 needs-review
+lassi jira issue update PROJ-123 --field 'labels=["backend"]'  # replace all labels
+lassi jira issue update PROJ-123 --field 'labels=[]'           # clear all labels
+```
+
+Each argument is one case-sensitive label, with no whitespace; commas and JSON-looking text
+are literal label text. Add/remove reads the current labels, reports changed and unchanged
+labels, and skips the write when nothing needs changing. Adding an existing label or removing
+an absent one succeeds unchanged. The update preserves unrelated labels, including labels added
+after the preliminary read. Results describe changes relative to that read, not a final label list.
+
 ## Components and fix versions
 
 ```sh
