@@ -59,6 +59,8 @@ export function suggestionsFor(path: string, input: SuggestionInput): string[] {
     case 'jira issue transition do':
     case 'jira issue component add':
     case 'jira issue component remove':
+    case 'jira issue label add':
+    case 'jira issue label remove':
     case 'jira issue fix-version set':
       return [`Run \`lassi jira issue get ${str(data['key'], arg(0, '<KEY>'))}\` to verify.`];
     case 'jira project component list':
