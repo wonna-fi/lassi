@@ -50,10 +50,11 @@ function imageTitle(params: string | undefined): string | undefined | null {
  */
 const HTML_BREAK: PhrasingContent = { type: 'html', value: '<br>' };
 
-/** Replaces a trailing break, which markdown cannot carry at the end of a block. */
+/** Keeps trailing breaks and break-only paragraphs from becoming literal backslashes. */
 export function breakSafeRun(nodes: PhrasingContent[]): PhrasingContent[] {
   const last = nodes[nodes.length - 1];
   if (last?.type !== 'break') return nodes;
+  if (nodes.every((node) => node.type === 'break')) return nodes.map(() => ({ ...HTML_BREAK }));
   return [...nodes.slice(0, -1), { ...HTML_BREAK }];
 }
 

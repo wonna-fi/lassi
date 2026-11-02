@@ -55,6 +55,7 @@ export const LassiConfigSchema = z.strictObject({
       ...product,
       /** alias -> field id, or { id, editable, format, exclude } (workspace file). */
       fields: z.record(z.string(), jiraFieldEntry).default({}),
+      headingSpacers: z.boolean().default(true),
       defaultProject: z.string().optional(),
       /** Regular expression whose first capture group is the issue key in a branch name (`.` as the key). */
       branchPattern: z.string().optional(),

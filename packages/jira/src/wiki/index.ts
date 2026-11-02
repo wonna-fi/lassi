@@ -1,6 +1,6 @@
 import { stringifyMarkdown, type BodyConverter } from '@wonna/lassi-core';
 import { wikiToMdast } from './parse/to-mdast.js';
-import { markdownToWiki, type WikiWarning } from './serialize/index.js';
+import { markdownToWiki, type WikiSerializeOptions, type WikiWarning } from './serialize/index.js';
 
 export { wikiToMdast } from './parse/to-mdast.js';
 export { parseInline } from './parse/inline.js';
@@ -9,6 +9,7 @@ export {
   collectMentions,
   markdownToWiki,
   mdastToWiki,
+  type WikiSerializeOptions,
   type WikiSerializeResult,
   type WikiWarning,
   type WikiWarningCode,
@@ -22,13 +23,13 @@ export function wikiToMarkdown(wiki: string): string {
 
 /** Both directions behind core's `BodyConverter`; warnings go to `onWarning` (default: dropped). */
 export function createWikiConverter(
-  opts: { onWarning?: (warning: WikiWarning) => void } = {}
+  opts: WikiSerializeOptions & { onWarning?: (warning: WikiWarning) => void } = {}
 ): BodyConverter {
   return {
     format: 'wiki',
     toMarkdown: wikiToMarkdown,
     fromMarkdown(markdown) {
-      const result = markdownToWiki(markdown);
+      const result = markdownToWiki(markdown, opts);
       for (const warning of result.warnings) opts.onWarning?.(warning);
       return result.wiki;
     },
