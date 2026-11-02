@@ -3,7 +3,7 @@ import type { JiraFieldMeta, JiraFieldMetaMap, JiraFieldSchema } from '../client
 import { fieldIdFor } from '../fields/aliases.js';
 import { AllowedValueMismatch, scalarToApiValue, standardSchema } from '../fields/normalize.js';
 import { assertWritable, type FieldPolicy } from '../fields/policy.js';
-import { markdownToWiki } from '../wiki/index.js';
+import { markdownToWiki, type WikiSerializeOptions } from '../wiki/index.js';
 import type { IssueCache } from './cache.js';
 
 export interface DiffInput {
@@ -162,13 +162,14 @@ export function frontmatterDiff(
   cache: IssueCache,
   current: DiffInput,
   policy: FieldPolicy,
-  editmeta?: JiraFieldMetaMap
+  editmeta?: JiraFieldMetaMap,
+  opts: WikiSerializeOptions = {}
 ): DiffResult {
   const { changes, descriptionChanged, warnings } = frontmatterChanges(cache, current, policy);
   const fields: Record<string, unknown> = {};
   for (const change of changes) {
     if (change.wiki && typeof change.value === 'string') {
-      const converted = markdownToWiki(change.value);
+      const converted = markdownToWiki(change.value, opts);
       for (const w of converted.warnings) {
         warnings.push(
           `${change.key}: ${w.message}${w.line === undefined ? '' : ` (line ${w.line})`}`

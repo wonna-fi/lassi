@@ -23,6 +23,7 @@ describe('config show', () => {
     expect(out).toContain('| jira.tokenFile | /home/u/t.txt | ~/.lassi.json |');
     expect(out).toContain('| jira.fields.team | customfield_10001 | ~/proj/.lassi.json |');
     expect(out).toContain('| http.timeoutMs | 30000 | default |');
+    expect(out).toContain('| jira.headingSpacers | true | default |');
     expect(out).toContain('| storage.exportDir | /home/u/.lassi/export | default |');
     expect(out).toContain('| storage.indexDir | /home/u/.lassi/index | default |');
     expect(out).not.toContain('env-secret-token');
@@ -41,5 +42,18 @@ describe('config show', () => {
       from: 'LASSI_CONFLUENCE_TOKEN',
     });
     expect(t.stdout()).not.toContain('env-secret-token');
+  });
+
+  it('shows a workspace heading-spacing opt-out and its source', async () => {
+    const t = makeTestProgram({
+      files: { '/home/u/proj/.lassi.json': JSON.stringify({ jira: { headingSpacers: false } }) },
+    });
+    expect(await t.run(['config', 'show', '--json'])).toBe(0);
+    const doc = JSON.parse(t.stdout());
+    expect(doc.config['jira.headingSpacers']).toBe(false);
+    expect(doc.sources['jira.headingSpacers']).toEqual({
+      source: 'workspace',
+      from: '/home/u/proj/.lassi.json',
+    });
   });
 });

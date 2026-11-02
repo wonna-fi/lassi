@@ -1,11 +1,21 @@
 h1. Title one
 
+&nbsp;
+
 h2. Title *two* with _emphasis_
+
+&nbsp;
 
 h3. NoSpace after the dot
 
+&nbsp;
+
 h4. Four
 
+&nbsp;
+
 h5. Five
+
+&nbsp;
 
 h6. Six {{mono}} and [link|https://x.example.com]

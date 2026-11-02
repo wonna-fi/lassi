@@ -188,6 +188,129 @@ const APPENDIX_B_MD =
 const APPENDIX_B_WIKI =
   'h3. Root cause\n\nThe password field is _optional_ in the DTO but the validator assumes it is present.\n\n{code:ts}\nconst pw = dto.password.trim();\n{code}\n';
 
+describe.each([true, false])('Jira writes with headingSpacers=%s', (headingSpacers) => {
+  const markdown = 'Intro\n\n## Details\n\nBody\n';
+  const wiki = `Intro\n\n${headingSpacers ? '&nbsp;\n\n' : ''}h2. Details\n\nBody\n`;
+  const setup = () =>
+    program({
+      files: {
+        '/home/u/proj/.lassi.json': JSON.stringify({
+          jira: {
+            headingSpacers,
+            defaultProject: 'PROJ',
+            fields: {
+              team: { id: 'customfield_10001', editable: true },
+              notes: { id: 'customfield_10020', editable: true, format: 'wiki' },
+            },
+            templates: {
+              spaced: {
+                type: 'Bug',
+                summary: 'Heading spacing',
+                fields: { team: 'Platform' },
+                description: markdown,
+              },
+            },
+          },
+        }),
+      },
+      routes: [
+        {
+          path: '/rest/api/2/issue/PROJ-123/editmeta',
+          json: {
+            fields: {
+              description: { name: 'Description', schema: { type: 'string' }, operations: ['set'] },
+              customfield_10020: { name: 'Notes', schema: { type: 'string' }, operations: ['set'] },
+            },
+          },
+        },
+      ],
+    });
+
+  it.each([
+    {
+      name: 'comment add',
+      args: ['comment', 'add', 'PROJ-123', '--body', markdown],
+      payload: { body: wiki },
+    },
+    {
+      name: 'comment edit',
+      args: ['comment', 'edit', 'PROJ-123', '2', '--body', markdown],
+      payload: { body: wiki },
+    },
+    {
+      name: 'description update',
+      args: ['update', 'PROJ-123', '--body', markdown],
+      payload: { fields: { description: wiki } },
+    },
+    {
+      name: 'wiki field update',
+      args: ['update', 'PROJ-123', '--field', `notes=${markdown}`],
+      payload: { fields: { customfield_10020: wiki } },
+    },
+    {
+      name: 'transition comment',
+      args: ['transition', 'do', 'PROJ-123', 'Start', '--comment', markdown],
+      payload: { transition: { id: '11' }, update: { comment: [{ add: { body: wiki } }] } },
+    },
+    {
+      name: 'template description',
+      args: ['create', '--template', 'spaced'],
+      payload: { fields: { description: wiki } },
+    },
+  ])('$name sends the same converted content as its dry-run preview', async ({ args, payload }) => {
+    const actual = setup();
+    expect(await actual.run(['jira', 'issue', ...args])).toBe(0);
+    expect(writes(actual)).toHaveLength(1);
+    const sent = JSON.parse(writes(actual)[0]?.bodyText ?? '');
+    expect(sent).toMatchObject(payload);
+    const dry = setup();
+    expect(await dry.run(['jira', 'issue', ...args, '--dry-run', '--json'])).toBe(0);
+    const preview = JSON.parse(dry.stdout());
+    expect(
+      preview.payloadLabel === 'body (wiki markup)'
+        ? { body: preview.payload }
+        : JSON.parse(preview.payload)
+    ).toEqual(sent);
+    expect(writes(dry)).toHaveLength(0);
+    expect(actual.fetch.unmatched).toEqual([]);
+    expect(dry.fetch.unmatched).toEqual([]);
+  });
+
+  it.each([true, false])(
+    'does not rewrite an unchanged working file with server spacers=%s',
+    async (serverSpacers) => {
+      const description = `Intro\n\n${serverSpacers ? '&nbsp;\n\n' : ''}h2. Details\n\nBody\n`;
+      const source = program({
+        routes: [
+          {
+            path: '/rest/api/2/issue/PROJ-123',
+            json: { ...ISSUE, fields: { ...ISSUE.fields, description } },
+          },
+        ],
+        files: {
+          '/home/u/proj/.lassi.json': JSON.stringify({ jira: { headingSpacers } }),
+        },
+      });
+      expect(
+        await source.run(['jira', 'issue', 'get', 'PROJ-123', '--out', 'work/PROJ-123.md'])
+      ).toBe(0);
+      const path = '/home/u/proj/work/PROJ-123.md';
+      const original = await source.fs.readFile(path);
+      expect(original).toContain(markdown);
+      expect(original).not.toContain('&nbsp;');
+      expect(
+        await source.run(['jira', 'issue', 'update', 'PROJ-123', '--file', 'work/PROJ-123.md'])
+      ).toBe(0);
+      expect(writes(source)).toHaveLength(0);
+      expect(source.fetch.calls.some((call) => call.url.pathname.endsWith('/editmeta'))).toBe(
+        false
+      );
+      expect(await source.fs.readFile(path)).toBe(original);
+      expect(source.stdout()).toContain('no changes for PROJ-123');
+    }
+  );
+});
+
 describe('lassi jira issue comment add|edit|delete', () => {
   it('converts the body to wiki markup, posts it and prints the id', async () => {
     const t = program();

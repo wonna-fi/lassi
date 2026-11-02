@@ -106,6 +106,7 @@ const RENAMED_KEYS: Readonly<Record<string, string>> = {
  */
 const WORKSPACE_ALLOWED: readonly string[] = [
   'jira.fields.',
+  'jira.headingSpacers',
   'jira.defaultProject',
   'jira.branchPattern',
   'jira.templates.',

@@ -49,6 +49,7 @@ export {
   mdastToWiki,
   wikiToMarkdown,
   wikiToMdast,
+  type WikiSerializeOptions,
   type WikiSerializeResult,
   type WikiWarning,
   type WikiWarningCode,

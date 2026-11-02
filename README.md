@@ -60,6 +60,15 @@ lassi config show --json
 lassi doctor
 ```
 
+### Jira heading spacing
+
+Jira Markdown writes add a standalone `&nbsp;` paragraph before headings that follow content,
+giving headings visible space above them. This applies to descriptions, comments, transition
+comments, and wiki-format fields. Set `"jira": { "headingSpacers": false }` in your global or
+workspace `.lassi.json` to disable it. Reading removes these spacer paragraphs before headings
+regardless of that setting, keeping Markdown clean across repeated edits. Existing issues are
+not rewritten automatically.
+
 ### Jira field policy
 
 `jira.fields` maps local aliases to Jira field ids. An entry is either the id or an object that

@@ -37,6 +37,8 @@ export const COLOR_VALUE = /^(#[0-9a-f]{3}|#[0-9a-f]{6}|[a-z]+)$/i;
 export const INLINE_MACROS: ReadonlySet<string> = new Set(['color']);
 
 export const HEADING = /^h([1-6])\.\s*(\S.*)$/;
+/** A standalone paragraph used to give Jira headings visible top spacing. */
+export const HEADING_SPACER = '&nbsp;';
 export const RULE = /^-{4,}\s*$/;
 export const LIST_ITEM = /^([*#]+|-)\s+(.*)$/;
 export const BQ = /^bq\.\s+(.*)$/;

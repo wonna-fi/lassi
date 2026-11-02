@@ -54,7 +54,7 @@ export async function markdownBodyToWiki(
       );
     }
   }
-  const { wiki, warnings } = mdastToWiki(tree);
+  const { wiki, warnings } = mdastToWiki(tree, { headingSpacers: ctx.config.jira.headingSpacers });
   for (const warning of warnings) {
     ctx.logger.warn(
       `${prefix}${warning.message}${warning.line === undefined ? '' : ` (line ${warning.line})`}`

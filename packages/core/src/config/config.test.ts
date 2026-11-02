@@ -128,7 +128,7 @@ describe('loadConfig', () => {
   it('yields defaults with every source marked default when nothing is configured', async () => {
     const loaded = await loadConfig({ env: {}, cwd, homedir, fs: memFs() });
     expect(loaded.config).toEqual({
-      jira: { fields: {}, templates: {} },
+      jira: { fields: {}, templates: {}, headingSpacers: true },
       confluence: {},
       output: { json: false, axi: false },
       embeddings: {
@@ -406,6 +406,44 @@ describe('the workspace layer is untrusted', () => {
     });
     expect(loaded.config.jira.tokenFile).toBe('/t/token.txt');
     expect(loaded.config.confluence.url).toBe('https://confluence.example.internal');
+  });
+});
+
+describe('jira.headingSpacers', () => {
+  const location = { cwd: '/home/u/proj', homedir: '/home/u', env: {} };
+
+  it('defaults on and tracks a global opt-out and workspace override', async () => {
+    const fs = memFs();
+    const defaults = await loadConfig({ ...location, fs });
+    expect(defaults.config.jira.headingSpacers).toBe(true);
+    expect(defaults.sources['jira.headingSpacers']).toEqual({ source: 'default' });
+    await fs.writeFile('/home/u/.lassi.json', JSON.stringify({ jira: { headingSpacers: false } }));
+    const global = await loadConfig({ ...location, fs });
+    expect(global.config.jira.headingSpacers).toBe(false);
+    expect(global.sources['jira.headingSpacers']).toEqual({
+      source: 'global',
+      from: '/home/u/.lassi.json',
+    });
+    await fs.writeFile(
+      '/home/u/proj/.lassi.json',
+      JSON.stringify({ jira: { headingSpacers: true } })
+    );
+    const workspace = await loadConfig({ ...location, fs });
+    expect(workspace.config.jira.headingSpacers).toBe(true);
+    expect(workspace.sources['jira.headingSpacers']).toEqual({
+      source: 'workspace',
+      from: '/home/u/proj/.lassi.json',
+    });
+    await fs.writeFile(
+      '/home/u/proj/.lassi.json',
+      JSON.stringify({ jira: { headingSpacers: false } })
+    );
+    expect((await loadConfig({ ...location, fs })).config.jira.headingSpacers).toBe(false);
+  });
+
+  it.each(['false', 0, null])('rejects a non-boolean value %j', async (headingSpacers) => {
+    const fs = memFs({ '/home/u/.lassi.json': JSON.stringify({ jira: { headingSpacers } }) });
+    await expect(loadConfig({ ...location, fs })).rejects.toMatchObject({ code: 'usage' });
   });
 });
 

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- Jira Markdown writes insert a standalone `&nbsp;` paragraph before headings that follow
+  content, improving spacing in Jira. Set `jira.headingSpacers` to `false` in global or workspace
+  configuration to opt out. Reading normalizes those spacers out of Markdown, including repeated
+  spacers, so they do not accumulate when editing. Existing issues change only when written.
+
 ## 0.1.0-alpha.8
 
 ### Breaking changes

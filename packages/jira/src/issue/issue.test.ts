@@ -376,21 +376,31 @@ describe('frontmatterChanges / fieldChangeToApi', () => {
     expect(warnings).toEqual(['readonly.customfield_10005 was edited; ignored']);
   });
 
-  it('frontmatterDiff sends a Markdown edit of a wiki field as wiki markup', () => {
-    const policy = fieldPolicy({ notes: { id: 'customfield_10020', editable: true } });
-    const wikiCache = {
-      ...cache,
-      editable: { ...cache.editable, notes: '**old**' },
-      formats: { customfield_10020: 'wiki' as const },
-    };
-    const result = frontmatterDiff(
-      wikiCache,
-      { editable: { ...wikiCache.editable, notes: '# New\n\n**bold** and `code`' }, body: '' },
-      policy
-    );
-    expect(result.fields).toEqual({ customfield_10020: 'h1. New\n\n*bold* and {{code}}\n' });
-    expect(result.changedKeys).toEqual(['notes']);
-  });
+  it.each([true, false])(
+    'frontmatterDiff converts wiki fields with headingSpacers=%s',
+    (headingSpacers) => {
+      const policy = fieldPolicy({ notes: { id: 'customfield_10020', editable: true } });
+      const wikiCache = {
+        ...cache,
+        editable: { ...cache.editable, notes: '**old**' },
+        formats: { customfield_10020: 'wiki' as const },
+      };
+      const result = frontmatterDiff(
+        wikiCache,
+        {
+          editable: { ...wikiCache.editable, notes: 'Intro\n\n# New\n\n**bold** and `code`' },
+          body: '',
+        },
+        policy,
+        undefined,
+        { headingSpacers }
+      );
+      expect(result.fields).toEqual({
+        customfield_10020: `Intro\n\n${headingSpacers ? '&nbsp;\n\n' : ''}h1. New\n\n*bold* and {{code}}\n`,
+      });
+      expect(result.changedKeys).toEqual(['notes']);
+    }
+  );
 
   it('marks a change to a field the file showed as Markdown', () => {
     const policy = fieldPolicy({ notes: { id: 'customfield_10020', editable: true } });

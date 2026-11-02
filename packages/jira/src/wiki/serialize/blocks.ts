@@ -9,13 +9,14 @@ import type {
   Table,
   TableCell,
 } from 'mdast';
-import { TASK } from '../syntax.js';
+import { HEADING_SPACER, TASK } from '../syntax.js';
 import { renderRun, type Container } from './inline.js';
 import type { Warnings } from './warnings.js';
 
 export interface BlockContext {
   warnings: Warnings;
   definitions: ReadonlyMap<string, Definition>;
+  headingSpacers: boolean;
 }
 
 const LANG = /^[A-Za-z0-9_+#.-]+$/;
@@ -36,11 +37,25 @@ export function renderBlocks(nodes: RootContent[], ctx: BlockContext): string[] 
   return out;
 }
 
+function addHeadingSpacer(out: string[]): void {
+  const previous = out.at(-1)?.trim();
+  // An authored spacer or break-only paragraph already supplies the separation.
+  if (
+    previous === undefined ||
+    previous === '' ||
+    previous === HEADING_SPACER ||
+    /^(?:\\\\|\s)+$/.test(previous)
+  )
+    return;
+  out.push(HEADING_SPACER);
+}
+
 function renderBlock(node: RootContent, ctx: BlockContext, out: string[]): void {
   switch (node.type) {
     case 'heading': {
       const text = run(node.children, 'heading', ctx);
       if (text.trim() === '') ctx.warnings.add('empty-heading', 'empty heading', node);
+      if (ctx.headingSpacers) addHeadingSpacer(out);
       out.push(`h${node.depth}. ${text}`);
       return;
     }
@@ -68,6 +83,11 @@ function renderBlock(node: RootContent, ctx: BlockContext, out: string[]): void 
     case 'definition':
       return;
     case 'html':
+      // A lone <br> is parsed as an HTML block, unlike breaks embedded in a paragraph.
+      if (/^<br\s*\/?>$/i.test(node.value.trim())) {
+        out.push('\\\\');
+        return;
+      }
       throw new LassiError(
         'validation',
         `HTML blocks are not supported in Jira wiki markup: ${node.value.slice(0, 40)}`,

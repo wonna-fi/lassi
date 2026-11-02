@@ -1,4 +1,12 @@
-import { BQ, HEADING, INLINE_MACROS, LIST_ITEM, RULE, VERBATIM_OPEN } from '../syntax.js';
+import {
+  BQ,
+  HEADING,
+  HEADING_SPACER,
+  INLINE_MACROS,
+  LIST_ITEM,
+  RULE,
+  VERBATIM_OPEN,
+} from '../syntax.js';
 import { parseCodeParams, parseMacroHeader } from './macros.js';
 import { parseTable, type WikiRow } from './tables.js';
 
@@ -242,6 +250,17 @@ export function tokenizeBlocks(input: string[]): BlockToken[] {
 
     const heading = HEADING.exec(t);
     if (heading) {
+      // Normalize only standalone spacer paragraphs before a parsed heading. Code and raw
+      // macros have already been consumed above; entities elsewhere remain ordinary content.
+      let previous = out.at(-1);
+      while (
+        previous?.type === 'paragraph' &&
+        previous.lines.length === 1 &&
+        previous.lines[0] === HEADING_SPACER
+      ) {
+        out.pop();
+        previous = out.at(-1);
+      }
       out.push({
         type: 'heading',
         depth: Number(heading[1]),
