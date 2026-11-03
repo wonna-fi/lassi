@@ -13,12 +13,12 @@
     "!dist/**/*.test.*"
   ],
   "dependencies": {
-    "@azure/identity": "^4.13.2",
+    "@azure/identity": "^4.14.1",
+    "@toon-format/toon": "^4.1.1",
     "@wonna/lassi-confluence": "*",
     "@wonna/lassi-core": "*",
     "@wonna/lassi-jira": "*",
     "@wonna/lassi-search": "*",
-    "@toon-format/toon": "^4.1.1",
     "commander": "^15.0.0"
   },
   "license": "MIT"
