@@ -1,6 +1,6 @@
 {
   "name": "@wonna/lassi-core",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "private": true,
   "description": "lassi core: config, auth, HTTP client, error contract, markdown pivot, logging",
   "type": "module",
@@ -32,7 +32,7 @@
     "micromark-util-types": "^2.0.2",
     "unist-util-visit": "^5.1.0",
     "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "license": "MIT"
 }
