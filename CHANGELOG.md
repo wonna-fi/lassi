@@ -2,14 +2,29 @@
 
 ## Unreleased
 
+## 0.1.0-alpha.9
+
+### Added
+
+- `lassi jira issue label add <KEY> <LABEL...>` and
+  `lassi jira issue label remove <KEY> <LABEL...>` change selected labels while preserving the
+  others. Labels are case-sensitive; already-present additions and already-absent removals
+  are no-ops. Both commands support dry-run and read-only safeguards.
+
 ### Fixed
 
 - Updated Azure Identity, Zod, Vitest and their dependencies to clear reported npm audit findings.
-
 - Jira Markdown writes insert a standalone `&nbsp;` paragraph before headings that follow
   content, improving spacing in Jira. Set `jira.headingSpacers` to `false` in global or workspace
   configuration to opt out. Reading normalizes those spacers out of Markdown, including repeated
   spacers, so they do not accumulate when editing. Existing issues change only when written.
+
+### Upgrading
+
+Requires Node.js 24 or newer. Run `npm install -g @wonna/lassi@alpha` to update.
+Refresh the Jira skill with `lassi skills install --only jira`, using your original target options,
+for guidance on the label commands. Back up and review customized skills before using `--force`.
+No persisted-data migration or bulk rewrite of Jira issues is required.
 
 ## 0.1.0-alpha.8
 
